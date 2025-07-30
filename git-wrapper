@@ -1,0 +1,417 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+use std
+
+const GIT_FOLDER = $"($nu.home-path)/Development/git-repositories"
+const GIT_DEFAULT_BRANCH = "main"
+
+# TODO: Wait the following issues before to enable the reftable option:
+# - https://github.com/starship/starship/issues/6086
+# - https://github.com/zed-industries/zed/issues/14414
+# const GIT_CLONE_DEFAULT_ARGS = ["--quiet", "--ref-format=reftable", "--recurse-submodules", "--shallow-submodules", "-j2"]
+const GIT_CLONE_DEFAULT_ARGS = ["--quiet", "--recurse-submodules", "--shallow-submodules", "-j2"]
+
+const PERSONAL_REPOSITORIES = [
+    {"host": "https://github.com/", "path": "jaudiger/brainfuck-gui-rs"},
+    {"host": "https://github.com/", "path": "jaudiger/brainfuck-rs"},
+    {"host": "https://github.com/", "path": "jaudiger/brioche"},
+    {"host": "https://github.com/", "path": "jaudiger/brioche-packages"},
+    {"host": "https://github.com/", "path": "jaudiger/brioche-packages-extra"},
+    {"host": "https://github.com/", "path": "jaudiger/brioche-registry"},
+    {"host": "https://github.com/", "path": "jaudiger/brioche-runtime-utils"},
+    {"host": "https://github.com/", "path": "jaudiger/brioche.dev"},
+    {"host": "https://github.com/", "path": "jaudiger/calculator-gui-rs"},
+    {"host": "https://github.com/", "path": "jaudiger/dotfiles"},
+    {"host": "https://github.com/", "path": "jaudiger/gitops-deployments"},
+    {"host": "https://github.com/", "path": "jaudiger/iowa-rs"},
+    {"host": "https://github.com/", "path": "jaudiger/personal-scripts"},
+    {"host": "https://github.com/", "path": "jaudiger/personal-website"},
+    {"host": "https://github.com/", "path": "jaudiger/reusable-workflows"},
+    {"host": "https://github.com/", "path": "jaudiger/setup-brioche"},
+    {"host": "https://github.com/", "path": "jaudiger/vscode-dev-containers"},
+]
+
+def check-uncommit [repo: string; quiet: bool; dry_run: bool]: nothing -> bool {
+    let result = ^git -C $repo status --porcelain
+    if ($result | is-not-empty) {
+        if not $quiet {
+            print $"Uncommitted changes in ($repo):\n($result)"
+        }
+
+        if not $dry_run {
+            let result = input "Do you want to remove the uncommitted changes [y/n]: "
+            if ($result == "y") {
+                ^git -C $repo reset --hard
+                ^git -C $repo clean -qfd
+            }
+        }
+
+        print ""
+
+        return true
+    }
+
+    return false
+}
+
+def check-stash [repo: string; quiet: bool; dry_run: bool]: nothing -> bool {
+    let result = ^git -C $repo stash list
+    if ($result | is-not-empty) {
+        if not $quiet {
+            print $"Stash entries in ($repo):\n($result)"
+        }
+
+        if not $dry_run {
+            let result = input "Do you want to remove the stash entries [y/n]: "
+            if ($result == "y") {
+                ^git -C $repo stash clear
+            }
+        }
+
+        print ""
+
+        return true
+    }
+
+    return false
+}
+
+def check-branch [repo: string; branch: string; up_to_date: bool; quiet: bool; dry_run: bool]: nothing -> bool {
+    let git_local_branch = (^git -C $repo branch --show-current | str trim)
+    if not ($git_local_branch | str contains $branch) {
+        if not $quiet {
+            print $"Current branch ($git_local_branch) of ($repo) is not the expected branch ($branch)"
+        }
+
+        if not $dry_run {
+            let result = input "Do you want to change the branch [y/n]: "
+            if ($result == "y") {
+                ^git -C $repo checkout $branch
+            }
+        }
+
+        return true
+    }
+
+    if $up_to_date {
+        ^git -C $repo fetch out+err> (std null-device)
+
+        # Ensure that the remote branch does exist
+        let remote_branch = (^git -C $repo ls-remote --heads origin $git_local_branch)
+        if ($remote_branch | is-empty) {
+            if not $quiet {
+                print $"Remote branch ($git_local_branch) does not exist in ($repo)"
+            }
+
+            return true
+        }
+
+        let git_local_commit = (^git -C $repo rev-parse $git_local_branch)
+        let git_remote_commit = (^git -C $repo rev-parse origin/($git_local_branch))
+
+        if ($git_local_commit != $git_remote_commit) {
+            if not $quiet {
+                print $"Current branch ($git_local_branch) of ($repo) is not up to date with the remote branch"
+            }
+
+            if not $dry_run {
+                let result = input "Do you want to pull the changes [y/n]: "
+                if ($result == "y") {
+                    ^git -C $repo pull out+err> (std null-device)
+                }
+            }
+
+            return true
+        }
+    }
+
+    return false
+}
+
+def gitlab-get-pr [source_branch: string]: nothing -> record {
+    let gitlab_mr = (^glab mr list --source-branch=($source_branch) --output=json | from json)
+    if ($gitlab_mr | length) > 0 {
+        return ($gitlab_mr | get 0)
+    }
+
+    return {}
+}
+
+def git-clone [git_main_host: string; git_repo: string; output_folder: string; quiet: bool; dry_run: bool]: nothing -> nothing {
+    if not $quiet {
+        print $"Cloning ($git_repo)..."
+    }
+
+    if not $dry_run {
+        ^git clone ...$GIT_CLONE_DEFAULT_ARGS $"($git_main_host)($git_repo).git" $output_folder
+    }
+}
+
+def git-clone-non-empty-folder [git_main_host: string; git_repo: string; output_folder: string; quiet: bool; dry_run: bool]: nothing -> nothing {
+    if not $quiet {
+        print $"Finish initialization of ($git_repo)..."
+    }
+
+    if not $dry_run {
+        let temp_dir = mktemp -d
+        ^git clone ...$GIT_CLONE_DEFAULT_ARGS $"($git_main_host)($git_repo).git" $temp_dir
+
+        for content in (ls -a $temp_dir) {
+            ^mv $content.name $output_folder
+        }
+    }
+}
+
+def git-sync [git_repo: string; quiet: bool; dry_run: bool]: nothing -> nothing {
+    if not $quiet {
+        print $"Syncing ($git_repo)..."
+    }
+
+    if not $dry_run {
+        cd $"($GIT_FOLDER)/($git_repo)"
+
+        ^git branch-sync
+        ^git tag-sync
+    }
+}
+
+# Check if the current branch is in conflict with remote branches
+def "main branch conflict" [
+    --mr # Add a comment on the merge request if a conflict is found
+]: nothing -> nothing {
+    # Ensure the branches are up to date
+    git fetch
+
+    let git_remote = (^git remote get-url origin)
+    let git_local_branch = (^git branch --show-current | str trim)
+    let git_remote_branches = (^git branch -r | lines | each { |it| $it | str trim } | where { |it| $it != $git_local_branch and not ($it | str contains "main") and not ($it | str contains "master")})
+    mut comments = ""
+
+    # Add specific comment for merge request
+    if $mr {
+        $comments += $"# Git Analysis\n"
+    }
+
+    for $remote_branch in $git_remote_branches {
+        let conflicts = (^git branch-conflict $remote_branch | lines)
+        if ($conflicts | length) > 0 {
+            # Add specific formatting for merge request
+            if $mr {
+                $comments += $"## "
+            }
+
+            let remote_format_branch = ($remote_branch | str replace "origin/" "")
+            $comments += $"Conflict with ($remote_format_branch)"
+            if ($git_remote | str starts-with "git@gitlab.com") {
+                let gitlab_mr_url = (gitlab-get-pr $remote_format_branch) | get web_url?
+                if ($gitlab_mr_url | is-not-empty) {
+                    $comments += $" \(see ($gitlab_mr_url)\)"
+                }
+            }
+
+            if not $mr {
+                $comments += $":"
+            }
+
+            $comments += $"\n"
+
+            for $conflict in $conflicts {
+                $comments += $"  - ($conflict)\n"
+            }
+        }
+    }
+
+    $comments = ($comments | str trim)
+    if ($git_remote | str starts-with "git@gitlab.com") and $mr {
+        ^glab mr note $git_local_branch --unique -m $"($comments)"
+    } else {
+        print $"($comments)"
+    }
+
+    if ($comments | is-not-empty) {
+        exit 1
+    } else {
+        exit 0
+    }
+}
+
+# Check for uncommitted changes and stashes in git repositories
+def "main repositories check" [
+    --uncommit(-u) # Check for uncommitted changes
+    --stash(-s) # Check for stashes
+    --branch(-b) # Check for the correct branch
+    --dry-run # Dry run
+]: nothing -> nothing {
+    # Find all git repositories
+    let git_dirs = (^git-wrapper repositories ls) | from nuon
+
+    for repo in $git_dirs {
+        if $uncommit {
+            check-uncommit $repo false $dry_run
+        }
+
+        if $stash {
+            check-stash $repo false $dry_run
+        }
+
+        if $branch {
+            check-branch $repo $GIT_DEFAULT_BRANCH true false $dry_run
+        }
+    }
+}
+
+# Find all git repositories of the given path excluding submodules
+def "main repositories ls" [
+    --path: string = $GIT_FOLDER # Path to the git repositories
+    --exclude: list<string> = ["build", ".terraform"] # Directories to exclude
+]: nothing -> string {
+    mut git_dirs = glob $"($path)/**/{.git}"
+        | path dirname
+
+    for filter in $exclude {
+        $git_dirs = $git_dirs
+            | where {|git_dir| not ($git_dir | str contains $filter)}
+    }
+
+    $git_dirs
+        | where {|git_dir| ^git -C $git_dir rev-parse --show-superproject-working-tree | is-empty}
+        | to nuon
+}
+
+# Sync all the git repositories
+def "main repositories sync" [
+    --all(-a) # Sync all the repositories
+    --work # Sync only the work repositories
+    --personal # Sync only the personal repositories
+    --dry-run # Dry run
+]: nothing -> nothing {
+    mut projects = []
+
+    if ($work or $all) {
+        $projects = $projects
+            | append (git-work-wrapper repositories ls | from nuon)
+    }
+    if ($personal or $all) {
+        $projects = $projects
+            | append $PERSONAL_REPOSITORIES
+    }
+
+    for project in $projects {
+        if not ($"($GIT_FOLDER)/($project.path)" | path exists) {
+            git-clone $project.host $project.path $"($GIT_FOLDER)/($project.path)" false $dry_run
+        } else if not ($"($GIT_FOLDER)/($project.path)/.git" | path exists) {
+            git-clone-non-empty-folder $project.host $project.path $"($GIT_FOLDER)/($project.path)" false $dry_run
+        } else {
+            git-sync $project.path false $dry_run
+        }
+    }
+}
+
+# Check the uncommited changes of a git repository
+def "main repository check uncommit" [
+    --quiet # Do not print the result
+]: nothing -> bool {
+    check-uncommit (pwd) $quiet true
+}
+
+# Check the stashes of a git repository
+def "main repository check stash" [
+    --quiet # Do not print the result
+]: nothing -> bool {
+    check-stash (pwd) $quiet true
+}
+
+# Check if the branch is the correct one, and up to date
+def "main repository check branch" [
+    --branch: string # Branch to check
+    --up-to-date # Check if the branch is up to date
+    --quiet # Do not print the result
+]: nothing -> bool {
+    check-branch (pwd) $branch $up_to_date $quiet true
+}
+
+# Commit the changes of a git repository using conventional commit
+def "main repository commit" [
+    --message(-m): string       # Message of the commit
+    --commit-type(-t): string   # Commit type
+    --commit-scope(-s): string  # Commit scope
+    --commit-breaking(-b)       # Mark commit as breaking
+    --emoji                     # Use emoji in the commit message
+    --all(-a)                   # Automatically stage all modified, newly and deleted files
+    --quiet                     # Do not print the result
+] {
+    const commit_type_emoticons = {
+        "build": "🛠"
+        "chore": "♻️"
+        "ci": "⚙️"
+        "docs": "📚"
+        "feat": "✨"
+        "fix": "🐛"
+        "perf": "🚀"
+        "refactor": "📦"
+        "revert": "🗑"
+        "style": "💎"
+        "test": "🚨"
+        "release": "🔖"
+        "sec": "🔒"
+        "wip": "🚧"
+    }
+
+    # Ensure we have the mandatory information, ask if not
+    mut msg_commit_type = $commit_type
+    while ($msg_commit_type == null or $msg_commit_type == "" or (not ($msg_commit_type in $commit_type_emoticons))) {
+        $msg_commit_type = (input $"Enter the commit type: ")
+    }
+
+    mut msg_commit_scope = $commit_scope
+    while ($msg_commit_scope == null) {
+        $msg_commit_scope = (input "Enter the commit scope: ")
+    }
+
+    mut msg_message = $message
+    while ($msg_message == null or $msg_message == "") {
+        $msg_message = (input "Enter commit message: ")
+    }
+
+    # Generate full commit message
+    let $msg_commit_scope = if ($msg_commit_scope != null and $msg_commit_scope != "") {
+        $"\(($msg_commit_scope)\)"
+    } else {
+        ""
+    }
+    let $msg_commit_breaking = if ($commit_breaking) {
+        "!"
+    } else {
+        ""
+    }
+    let $msg_emoji = if ($emoji and $msg_commit_type in $commit_type_emoticons) {
+        $"($commit_type_emoticons | get $msg_commit_type) "
+    } else {
+        ""
+    }
+
+    let $msg_full = ({
+        type: $msg_commit_type
+        scope: $msg_commit_scope
+        breaking: $msg_commit_breaking
+        emoji: $msg_emoji
+        msg: $msg_message
+    } | format pattern "{type}{scope}{breaking}: {emoji}{msg}")
+
+    if not $quiet {
+        print $"\nCommitting '($msg_full)' to the repository"
+    }
+
+    # Commit the changes
+    if $all {
+        ^git add .
+    }
+
+    ^git commit --message $msg_full
+}
+
+def main []: nothing -> nothing {}

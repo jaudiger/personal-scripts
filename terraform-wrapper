@@ -1,0 +1,103 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+use std
+
+const GIT_FOLDER = $"($nu.home-path)/Development/git-repositories"
+
+const TERRAGRUNT_CACHE_FOLDER = ".terragrunt-cache"
+const TERRAFORM_CACHE_FOLDER = ".terraform"
+const TERRAFORM_LOCK_FILE = ".terraform.lock.hcl"
+const TERRAFORM_BACKEND_FILE = "backend.tfvars"
+
+# Cleanup all the cache directories of the current directory recursively
+def "main cache cleanup" [
+    --path: string=$GIT_FOLDER # The path to clean
+    --dry-run # Do not cleanup the cache directories
+    --quiet # Do not print the build directories cleaned
+]: nothing -> nothing {
+    let cache_directories = glob $"($path)/**/($TERRAFORM_CACHE_FOLDER)"
+
+    for cache_directory in $cache_directories {
+        # Skip the file if it is not in a root directory
+        let stats = ($cache_directory | split row '/' | uniq --count)
+        let terragrunt_folder = ($stats | find --regex $"^($TERRAGRUNT_CACHE_FOLDER)$")
+        if ($terragrunt_folder | is-not-empty) {
+            continue
+        }
+
+        if not $quiet {
+            print $"Cleaning the cache directory ($cache_directory)"
+        }
+
+        if $dry_run {
+            continue
+        }
+
+        rm -r $cache_directory
+    }
+}
+
+# Update all the lock files of the current directory recursively
+def "main lock update" [
+    --dry-run # Do not update the lock files
+]: nothing -> nothing {
+    let lock_files = glob $"**/($TERRAFORM_LOCK_FILE)"
+
+    for lock_file in $lock_files {
+        # Skip the file if it is not in a root directory
+        let stats = ($lock_file | split row '/' | uniq --count)
+        let terraform_folder = ($stats | find --regex $"^($TERRAFORM_CACHE_FOLDER)$")
+        if ($terraform_folder | is-not-empty) {
+            continue
+        }
+
+        print $"Updating lock file ($lock_file)"
+
+        if $dry_run {
+            continue
+        }
+
+        rm $lock_file
+        cd ($lock_file | path dirname)
+
+        if ($TERRAFORM_BACKEND_FILE | path exists) {
+            ^terraform init -backend-config=($TERRAFORM_BACKEND_FILE) out+err> (std null-device)
+        } else {
+            ^terraform init out+err> (std null-device)
+        }
+    }
+
+    print "\nAll the lock files have been updated"
+}
+
+# Remove all the lock files of the current directory recursively
+def "main lock remove" [
+    --dry-run # Do not remove the lock files
+]: nothing -> nothing {
+    let lock_files = glob $"**/($TERRAFORM_LOCK_FILE)"
+
+    for lock_file in $lock_files {
+        # Skip the file if it is not in a root directory
+        let stats = ($lock_file | split row '/' | uniq --count)
+        let terraform_folder = ($stats | find --regex $"^($TERRAFORM_CACHE_FOLDER)$")
+        if ($terraform_folder | is-not-empty) {
+            continue
+        }
+
+        print $"Removing lock file ($lock_file)"
+
+        if $dry_run {
+            continue
+        }
+
+        rm $lock_file
+    }
+
+    print "\nAll the lock files have been removed"
+}
+
+def main []: nothing -> nothing {}

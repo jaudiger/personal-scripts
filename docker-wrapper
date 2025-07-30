@@ -1,0 +1,18 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+use std
+
+# Cleanup the docker
+def "main cache cleanup" [
+    --dry-run # Do not cleanup
+]: nothing -> nothing {
+    if not $dry_run {
+        ^docker system prune --force --all --volumes out+err> (std null-device)
+    }
+}
+
+def main []: nothing -> nothing {}

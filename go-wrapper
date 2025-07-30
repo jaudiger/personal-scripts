@@ -1,0 +1,21 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+# Cleanup all the build directories
+def "main cache cleanup" [
+    --dry-run # Do not cleanup the build directories
+    --quiet # Do not print the build directories cleaned
+]: nothing -> nothing {
+    let go_cache = ^go env GOCACHE
+
+    if ($go_cache | path exists) {
+        if not $dry_run {
+            rm -rf $go_cache
+        }
+    }
+}
+
+def main []: nothing -> nothing {}

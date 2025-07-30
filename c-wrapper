@@ -1,0 +1,44 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+use std
+
+const GIT_FOLDER = $"($nu.home-path)/Development/git-repositories"
+
+const CMAKE_CACHE_FILE = "CMakeCache.txt"
+const CMAKE_DEPS_FOLDER = "_deps"
+
+# Cleanup all the cache directories of the current directory recursively
+def "main cache cleanup" [
+    --path: string=$GIT_FOLDER # The path to clean
+    --dry-run # Do not cleanup the cache directories
+    --quiet # Do not print the build directories cleaned
+]: nothing -> nothing {
+    let cache_files = glob $"($path)/**/($CMAKE_CACHE_FILE)"
+
+    for cache_file in $cache_files {
+        let cache_directory = ($cache_file | path dirname)
+
+        # Skip the file if it is not in a root directory
+        let stats = ($cache_directory | split row '/' | uniq --count)
+        let deps_folder = ($stats | find --regex $"^($CMAKE_DEPS_FOLDER)$")
+        if ($deps_folder | is-not-empty) {
+            continue
+        }
+
+        if not $quiet {
+            print $"Cleaning the cache directory ($cache_directory)"
+        }
+
+        if $dry_run {
+            continue
+        }
+
+        rm -r $cache_directory
+    }
+}
+
+def main []: nothing -> nothing {}

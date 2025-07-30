@@ -1,0 +1,70 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+use std
+
+const DEFAULT_TARGET_BRANCH = "main"
+const DEFAULT_ASSIGNEE = "jaudiger"
+const DEFAULT_REVIEWER = ""
+
+def git_branch_info [branch_name: string]: nothing -> record {
+    const branch_regex = '^(?<type>.+)-i(?<issues>[0-9]+)-(?<name>.+)$'
+
+    let result = ($branch_name | parse --regex $branch_regex)
+    if ($result | is-empty) {
+        print $"The branch name does not match the required pattern: ($branch_regex)"
+        exit 1
+    }
+
+    {
+        type: ($result.type.0 | str title-case),
+        issue: ($result.issues.0 | into int),
+        name: ($result.name.0 | str replace --regex "(-,_)" " " | str title-case)
+    }
+}
+
+def gitlab_issue_info [project_issue: string, issue: int]: nothing -> record {
+    let issue_path = if ($project_issue | is-not-empty) {
+        $"($project_issue)/-/issues/($issue)"
+    } else {
+        $issue
+    }
+
+    let issue_info = (^glab issue view $issue_path --output json err> (std null-device)) | from json
+    if ($issue_info | is-empty) {
+        print $"Issue not found: ($issue_path)"
+        exit 1
+    }
+
+    $issue_info
+}
+
+# Create a new pull request for the current branch
+def "main pr create" [
+    --project-issue: string # The project path containing the issue
+    --reviewer: string = $DEFAULT_REVIEWER # The reviewer of the pull request
+    --target-branch: string = $DEFAULT_TARGET_BRANCH # The target branch of the pull request
+]: nothing -> nothing {
+    let branch_name = (^git branch --show-current | str trim)
+    let branch_info = git_branch_info $branch_name
+
+    if $branch_info.issue == 0 {
+        print $"Creating a new pull request for branch ($branch_name)"
+        let title = $"($branch_info.type): ($branch_info.name)"
+
+        ^glab mr create --signoff --remove-source-branch --target-branch $target_branch --assignee $DEFAULT_ASSIGNEE --reviewer $reviewer --title $title --fill --fill-commit-body --push --yes out+err> (std null-device)
+    } else {
+        print $"Creating a new pull request for branch ($branch_name) with issue ($branch_info.issue)"
+
+        let issue_info = gitlab_issue_info $project_issue $branch_info.issue
+        let title = $"Resolve \"($issue_info.title)\""
+        let description = $"Related to ($issue_info.web_url)"
+
+        ^glab mr create --signoff --remove-source-branch --target-branch $target_branch --assignee $DEFAULT_ASSIGNEE --reviewer $reviewer --title $title --description $description --push --yes out+err> (std null-device)
+    }
+}
+
+def main []: nothing -> nothing {}

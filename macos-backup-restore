@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+print_usage_and_exit () {
+    echo "Usage: $0 [OPTIONS] FOLDER"
+    echo "  OPTIONS:"
+    echo "    -b, --backup: Backup important files"
+    echo "    -r, --restore: Restore the files"
+    echo "    -f, --force: Force mode"
+    echo "    --help: Display this help and exit"
+    echo "  FOLDER: Folder where to save or load the archive"
+
+    exit 1
+}
+
+do_backup () {
+    echo "Backup important files..."
+
+    local -r FOLDER=${1}
+
+    # Check if the folder exist
+    if [[ ! -d "${FOLDER}" ]]; then
+        echo "Folder '${FOLDER}' does not exist to backup the archive"
+        return
+    fi
+
+    local -r TIMESTAMP="$(date +%Y-%m-%d || true)"
+    local -r ARCHIVE_OUTPUT="${FOLDER}/backup_${TIMESTAMP}.tar"
+    local -r COMPRESSED_ARCHIVE_OUTPUT="${ARCHIVE_OUTPUT}.gz"
+
+    # Check if the file already exist
+    if [[ -f "${COMPRESSED_ARCHIVE_OUTPUT}" ]]; then
+        if [[ "${FORCE}" = 0 ]]; then
+            echo "Backup file ${COMPRESSED_ARCHIVE_OUTPUT} already exist"
+            return
+        fi
+
+        rm "${COMPRESSED_ARCHIVE_OUTPUT}"
+    fi
+
+    # Backup folders
+    BACKUP_FOLDERS=(
+        Development/services
+        Development/vscode
+        Development/work-scripts
+    )
+
+    # First, archive raw folders
+    tar -cf "${ARCHIVE_OUTPUT}" "${BACKUP_FOLDERS[@]}"
+    # Then, archive files from find commands (to better handle folders with spaces)
+    find Development/git-repositories -type d \( -name '.devcontainer' -o -name '.idea' -o -name '.vscode' \) -exec tar -rf "${ARCHIVE_OUTPUT}" {} +
+    find Library/Application\ Support/JetBrains/**/codestyles -type f \( -iname '*.xml' -and ! -iname 'Default.xml' \) -exec tar -rf "${ARCHIVE_OUTPUT}" {} +
+
+    # Compress the archive
+    gzip "${ARCHIVE_OUTPUT}"
+
+    echo "Files backup into ${COMPRESSED_ARCHIVE_OUTPUT}"
+}
+
+do_restore () {
+    echo "Restore files..."
+
+    BACKUP_FILE=${1}
+
+    # Check file
+    if [[ ! -f "${BACKUP_FILE}" ]]; then
+        echo "Backup file ${BACKUP_FILE} does not exist"
+        return
+    fi
+
+    # Extract the files
+    tar -xf "${BACKUP_FILE}"
+
+    echo "Files has been restored"
+}
+
+# Default constants
+BACKUP=0
+RESTORE=0
+FORCE=0
+
+# Option parsing
+while [[ "$#" -gt 0 ]]; do
+  case "${1}" in
+    -b)
+        BACKUP=1
+        shift 1
+    ;;
+
+    --backup)
+        BACKUP=1
+        shift 1
+    ;;
+
+    -r)
+        RESTORE=1
+        shift 1
+    ;;
+
+    --restore)
+        RESTORE=1
+        shift 1
+    ;;
+
+    -f)
+        FORCE=1
+        shift 1
+    ;;
+
+    --force)
+        FORCE=1
+        shift 1
+    ;;
+
+    --help)
+        print_usage_and_exit
+    ;;
+
+    -*)
+        echo "Invalid option ${1}."
+        print_usage_and_exit
+    ;;
+
+    *)
+        ARGUMENT=${1}
+        break
+    ;;
+  esac
+done
+
+if [[ -z "${ARGUMENT}" ]] || { [[ "${BACKUP}" = 0 ]] && [[ "${RESTORE}" = 0 ]]; }; then
+    print_usage_and_exit
+fi
+
+# Check if the path is relative
+if [[ ! "${ARGUMENT}" = /* ]]; then
+    CURRENT_DIR="$(pwd)"
+
+    ARGUMENT="${CURRENT_DIR}/${ARGUMENT}"
+fi
+
+cd "${HOME}" || exit  # Go to user folder
+
+if [[ "${BACKUP}" = 1 ]]; then
+    do_backup "${ARGUMENT}"
+else
+    do_restore "${ARGUMENT}"
+fi

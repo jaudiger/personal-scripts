@@ -1,0 +1,20 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+const PNPM_CACHE_DIRECTORY = $"($nu.home-path)/.cache/pnpm"
+
+# Cleanup all the pnpm cache directory
+def "main cache cleanup" [
+    --dry-run # Do not cleanup the cache directories
+]: nothing -> nothing {
+    if ($PNPM_CACHE_DIRECTORY | path exists) {
+        if not $dry_run {
+            rm -rf $PNPM_CACHE_DIRECTORY
+        }
+    }
+}
+
+def main []: nothing -> nothing {}

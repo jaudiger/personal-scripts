@@ -1,0 +1,105 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+use std
+
+const CARGO_LOCAL_FOLDER = $"($nu.home-path)/.cargo"
+const GIT_FOLDER = $"($nu.home-path)/Development/git-repositories"
+const CARGO_FILE = "Cargo.toml"
+
+# Cleanup all the build directories of the current directory recursively
+def "main cache cleanup" [
+    --path: string=$GIT_FOLDER # The path to clean
+    --dry-run # Do not cleanup the build directories
+    --quiet # Do not print the build directories cleaned
+]: nothing -> nothing {
+    if ($CARGO_LOCAL_FOLDER | path exists) {
+        if not $quiet {
+            print $"Cleaning Cargo local directory ($CARGO_LOCAL_FOLDER)"
+        }
+
+        if not $dry_run {
+            rm -r $CARGO_LOCAL_FOLDER
+        }
+    }
+
+    let build_directories = glob $"($path)/**/target"
+
+    for build_directory in $build_directories {
+        # Skip the build directory if there is no configuration file at the root
+        if not ($"($build_directory)/../($CARGO_FILE)" | path exists) {
+            continue
+        }
+
+        if not $quiet {
+            print $"Cleaning build directory ($build_directory)"
+        }
+
+        if $dry_run {
+            continue
+        }
+
+        rm -r $build_directory
+    }
+}
+
+# Update the cargo version of the current directory
+def "main cargo version update" [
+    --major # Update the major version
+    --minor # Update the minor version
+    --patch # Update the patch version
+    --dry-run # Do not update the version
+    --quiet # Do not print the new version
+]: nothing -> string {
+    let cargo = open --raw $CARGO_FILE
+
+    # Extract the package name and current version
+    let package_name = $cargo
+        | parse --regex 'name\s*=\s*"(?<name>[^"]+)"'
+    let package_version = $cargo
+        | parse --regex 'version\s*=\s*"(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)"'
+
+    let project_name = $package_name.name.0
+    mut major_version = ($package_version.major.0 | into int)
+    mut minor_version = ($package_version.minor.0 | into int)
+    mut patch_version = ($package_version.patch.0 | into int)
+
+    if $major {
+        $major_version = $major_version + 1
+        $minor_version = 0
+        $patch_version = 0
+    } else if $minor {
+        $minor_version = $minor_version + 1
+        $patch_version = 0
+    } else if $patch {
+        $patch_version = $patch_version + 1
+    }
+
+    if not $dry_run {
+        let new_cargo = $cargo
+            | str replace --regex 'version\s*=\s*"\d+\.\d+\.\d+"' $'version = "($major_version).($minor_version).($patch_version)"'
+
+        $new_cargo
+            | str trim --right
+            | ($in + "\n")
+            | save --raw --force $CARGO_FILE
+
+        # Update only the current package in Cargo.lock
+        ^cargo update --workspace --package ($project_name) out+err> (std null-device)
+    }
+
+    if not $quiet {
+        print $"New Cargo version: ($major_version).($minor_version).($patch_version)"
+    }
+
+    {
+        major: $major_version,
+        minor: $minor_version,
+        patch: $patch_version
+    } | to nuon
+}
+
+def main []: nothing -> nothing {}

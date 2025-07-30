@@ -1,0 +1,52 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+const GIT_FOLDER = $"($nu.home-path)/Development/git-repositories"
+const PACKAGE_FILE = "package.json"
+
+# Cleanup all the build directories of the current directory recursively
+def "main cache cleanup" [
+    --path: string=$GIT_FOLDER # The path to clean
+    --dry-run # Do not cleanup the build directories
+    --quiet # Do not print the build directories cleaned
+]: nothing -> nothing {
+    let build_directories = glob $"($path)/**/{dist,node_modules}"
+
+    for build_directory in $build_directories {
+        # Skip the directory if it is not a build directory
+        # (i.e. dist and node_modules are not at the root, or there is a .venv directory)
+        let stats = ($build_directory | split row '/' | uniq --count)
+        let dist = ($stats | find dist)
+        let node_modules = ($stats | find --regex "^node_modules$")
+        let venv = ($stats | find --regex "^.venv$")
+        if ($venv | is-not-empty) {
+            continue
+        }
+        if ($dist | is-not-empty) and ($node_modules | is-not-empty) {
+            continue
+        }
+        if (($dist | is-not-empty) and ($dist | get count.0) > 1) or (($node_modules | is-not-empty) and ($node_modules | get count.0) > 1) {
+            continue
+        }
+
+        # Skip the build directory if there is no configuration file at the root
+        if not ($"($build_directory)/../($PACKAGE_FILE)" | path exists) {
+            continue
+        }
+
+        if not $quiet {
+            print $"Cleaning build directory ($build_directory)"
+        }
+
+        if $dry_run {
+            continue
+        }
+
+        rm -r $build_directory
+    }
+}
+
+def main []: nothing -> nothing {}

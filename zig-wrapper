@@ -1,0 +1,61 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+const GIT_FOLDER = $"($nu.home-path)/Development/git-repositories"
+
+const ZIG_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.cache/zig"
+const ZIG_LOCAL_CACHE_FOLDER = ".zig-cache"
+const ZIG_LOCAL_BUILD_FOLDER = "zig-out"
+
+# Cleanup all the build directories of the current directory recursively
+def "main cache cleanup" [
+    --path: string=$GIT_FOLDER # The path to clean
+    --dry-run # Do not cleanup the build directories
+    --quiet # Do not print the build directories cleaned
+]: nothing -> nothing {
+    # Cleanup Zig global cache directory
+    if ($ZIG_GLOBAL_CACHE_FOLDER | path exists) {
+        if not $quiet {
+            print $"Cleaning Zig global cache directory ($ZIG_GLOBAL_CACHE_FOLDER)"
+        }
+
+        if not $dry_run {
+            rm -r $ZIG_GLOBAL_CACHE_FOLDER
+        }
+    }
+
+    # Cleanup Zig local cache directory
+    let cache_directories = glob $"($path)/**/($ZIG_LOCAL_CACHE_FOLDER)"
+
+    for cache_directory in $cache_directories {
+        if not $quiet {
+            print $"Cleaning cache directory ($cache_directory)"
+        }
+
+        if $dry_run {
+            continue
+        }
+
+        rm -r $cache_directory
+    }
+
+    # Cleanup Zig local build directory
+    let build_directories = glob $"($path)/**/($ZIG_LOCAL_BUILD_FOLDER)"
+
+    for build_directory in $build_directories {
+        if not $quiet {
+            print $"Cleaning build directory ($build_directory)"
+        }
+
+        if $dry_run {
+            continue
+        }
+
+        rm -r $build_directory
+    }
+}
+
+def main []: nothing -> nothing {}

@@ -1,0 +1,100 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+const GIT_FOLDER = $"($nu.home-path)/Development/git-repositories"
+
+const MAVEN_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.m2"
+const POM_FILE = "pom.xml"
+
+# Update the main pom version of the current directory
+def "main pom version update" [
+    --major # Update the major version
+    --minor # Update the minor version
+    --patch # Update the patch version
+    --dry-run # Do not update the version
+    --quiet # Do not print the new version
+]: nothing -> string {
+    let pom = open --raw $POM_FILE
+
+    # Extract the current version
+    let version = $pom
+        | parse --regex '<version>(?<major>\d+).(?<minor>\d+).(?<patch>\d+)-RELEASE</version>'
+
+    mut major_version = ($version.major.0 | into int)
+    mut minor_version = ($version.minor.0 | into int)
+    mut patch_version = ($version.patch.0 | into int)
+
+    if $major {
+        $major_version = $major_version + 1
+        $minor_version = 0
+        $patch_version = 0
+    } else if $minor {
+        $minor_version = $minor_version + 1
+        $patch_version = 0
+    } else if $patch {
+        $patch_version = $patch_version + 1
+    }
+
+    if not $dry_run {
+        let new_pom = $pom
+            | str replace --regex "<version>[0-9.]+-RELEASE</version>" $"<version>($major_version).($minor_version).($patch_version)-RELEASE</version>"
+
+        $new_pom
+            | str trim --right
+            | ($in + "\n")
+            | save --raw --force $POM_FILE
+    }
+
+    if not $quiet {
+        print $"New POM version: ($major_version).($minor_version).($patch_version)-RELEASE"
+    }
+
+    {
+        major: $major_version,
+        minor: $minor_version,
+        patch: $patch_version
+    } | to nuon
+}
+
+# Cleanup all the build directories of the current directory recursively
+def "main cache cleanup" [
+    --path: string=$GIT_FOLDER # The path to clean
+    --dry-run # Do not cleanup the build directories
+    --quiet # Do not print the build directories cleaned
+]: nothing -> nothing {
+    # Cleanup Maven global cache directory
+    if ($MAVEN_GLOBAL_CACHE_FOLDER | path exists) {
+        if not $quiet {
+            print $"Cleaning Maven global cache directory ($MAVEN_GLOBAL_CACHE_FOLDER)"
+        }
+
+        if not $dry_run {
+            rm -r $MAVEN_GLOBAL_CACHE_FOLDER
+        }
+    }
+
+    # Cleanup Maven local build directory
+    let build_directories = glob $"($path)/**/target"
+
+    for build_directory in $build_directories {
+        # Skip the build directory if there is no configuration file at the root
+        if not ($"($build_directory)/../($POM_FILE)" | path exists) {
+            continue
+        }
+
+        if not $quiet {
+            print $"Cleaning build directory ($build_directory)"
+        }
+
+        if $dry_run {
+            continue
+        }
+
+        rm -r $build_directory
+    }
+}
+
+def main []: nothing -> nothing {}

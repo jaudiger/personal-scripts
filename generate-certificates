@@ -1,0 +1,161 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+use std
+
+def generate-root-certificate [
+    ca_folder: string;
+    ca_cnf_file: string;
+    ca_key_pem_file: string;
+    ca_key_der_file: string;
+    ca_cert_pem_file: string;
+    ca_cert_der_file: string;
+    rsa_enabled: bool;
+    cert_parameters: record
+]: nothing -> nothing {
+    # Setup
+    mkdir $ca_folder
+
+    # Generate key
+    if $rsa_enabled == false {
+        ^openssl ecparam -name prime256v1 -genkey -out $ca_key_pem_file
+    } else {
+        ^openssl genrsa -out $ca_key_pem_file 4096
+    }
+
+    # Generate certificate
+    ^openssl req -new -x509 -subj $"/C=($cert_parameters.country)/CN=($cert_parameters.common_name)Authority/L=($cert_parameters.locality)/O=($cert_parameters.organization)/OU=($cert_parameters.organizational_unit)/ST=($cert_parameters.state)" -config $ca_cnf_file -key $ca_key_pem_file -out $ca_cert_pem_file -batch out+err> (std null-device)
+
+    # Convert certificate
+    if $rsa_enabled == false {
+        ^openssl ec -outform der -in $ca_key_pem_file -out $ca_key_der_file out+err> (std null-device)
+    } else {
+        ^openssl rsa -outform der -in $ca_key_pem_file -out $ca_key_der_file out+err> (std null-device)
+    }
+    ^openssl x509 -outform der -in $ca_cert_pem_file -out $ca_cert_der_file
+
+    # Print the Base64 form of the DER
+    print $"Root private key: (open $ca_key_der_file | encode base64)"
+    print $"Root certificate: (open $ca_cert_der_file | encode base64)"
+}
+
+def generate-node-certificate [
+    node_folder: string;
+    ca_cnf_file: string;
+    ca_key_pem_file: string;
+    ca_cert_pem_file: string;
+    node_cnf_file: string;
+    node_key_pem_file: string;
+    node_key_der_file: string;
+    node_cert_pem_file: string;
+    node_cert_der_file: string;
+    node_cert_signing_request_file: string;
+    rsa_enabled: bool;
+    cert_parameters: record
+]: nothing -> nothing {
+    # Setup
+    mkdir $node_folder
+    touch index.txt
+    '01' | save serial.txt
+
+    # Generate key
+    if $rsa_enabled == false {
+        ^openssl ecparam -name prime256v1 -genkey -out $node_key_pem_file
+    } else {
+        ^openssl genrsa -out $node_key_pem_file 4096
+    }
+
+    # Generate certificate
+    mut options = ""
+    if ($cert_parameters.dns | is-not-empty) or ($cert_parameters.ip | is-not-empty) {
+        $options ++= "subjectAltName="
+
+        if ($cert_parameters.dns | is-not-empty) {
+            $options ++= $"DNS:($cert_parameters.dns)"
+        }
+        if ($cert_parameters.ip | is-not-empty) {
+            $options ++= $"IP:($cert_parameters.ip)"
+        }
+    }
+
+    let config_file = mktemp --tmpdir
+    ((open $node_cnf_file) ++ $options) | save -f $config_file
+
+    ^openssl req -new -subj $"/C=($cert_parameters.country)/CN=($cert_parameters.common_name)/L=($cert_parameters.locality)/O=($cert_parameters.organization)/OU=($cert_parameters.organizational_unit)/ST=($cert_parameters.state)" -config $config_file -key $node_key_pem_file -out $node_cert_signing_request_file -batch out+err> (std null-device)
+
+    rm $config_file
+
+    # Sign the certificate
+    ^openssl ca -config $ca_cnf_file -keyfile $ca_key_pem_file -cert $ca_cert_pem_file -policy signing_policy -extensions signing_node_req -out $node_cert_pem_file -outdir $node_folder -in $node_cert_signing_request_file -batch out+err> (std null-device)
+
+    # Convert certificate
+    if $rsa_enabled == false {
+        ^openssl ec -outform der -in $node_key_pem_file -out $node_key_der_file out+err> (std null-device)
+    } else {
+        ^openssl rsa -outform der -in $node_key_pem_file -out $node_key_der_file out+err> (std null-device)
+    }
+    ^openssl x509 -outform der -in $node_cert_pem_file -out $node_cert_der_file
+
+    # Print the Base64 form of the DER
+    print $"Node private key: (open $node_key_der_file | encode base64)"
+    print $"Node certificate: (open $node_cert_der_file | encode base64)"
+
+    # Misc
+    rm -rf $node_cert_signing_request_file
+    rm -rf $"($node_folder)/01.pem"
+    rm -rf index.txt*
+    rm -rf serial.txt*
+}
+
+# Generate certificates
+def "main" [
+    --country(-c): string # country field of the certificate
+    --dns(-d): string # DNS alternate name of the certificate
+    --ip(-i): string # IP alternate name of the certificate
+    --locality(-l): string # locality field of the certificate
+    --common-name(-n): string # common name field of the certificate
+    --organization(-o): string # organization field of the certificate
+    --state(-s): string # state field of the certificate
+    --unit(-u): string # organizational unit field of the certificate
+    --rsa # Generate certificates with rsa keys (instead of EC keys)
+    destination: string # The destination directory
+]: nothing -> nothing {
+    if ($destination | path exists) {
+        print $"Directory ($destination) already exist."
+        exit 1
+    }
+
+    let ca_folder = $"($destination)/ca"
+    let ca_cnf_file = $"($env.FILE_PWD)/misc/certs_config/ca_config.cnf"
+    let ca_key_pem_file = $"($ca_folder)/private_key.pem"
+    let ca_key_der_file = $"($ca_folder)/private_key.der"
+    let ca_cert_pem_file = $"($ca_folder)/certificate.pem"
+    let ca_cert_der_file = $"($ca_folder)/certificate.der"
+
+    let node_folder = $"($destination)/node"
+    let node_cnf_file = $"($env.FILE_PWD)/misc/certs_config/node_config.cnf"
+    let node_key_pem_file = $"($node_folder)/private_key.pem"
+    let node_key_der_file = $"($node_folder)/private_key.der"
+    let node_cert_pem_file = $"($node_folder)/certificate.pem"
+    let node_cert_der_file = $"($node_folder)/certificate.der"
+    let node_cert_signing_request_file = $"($node_folder)/certificate_signing_request.pem"
+
+    let cert_parameters = {
+        country: $country,
+        dns: $dns,
+        ip: $ip,
+        locality: $locality,
+        common_name: $common_name,
+        organization: $organization,
+        state: $state,
+        organizational_unit: $unit,
+    }
+
+    mkdir $destination
+
+    generate-root-certificate $ca_folder $ca_cnf_file $ca_key_pem_file $ca_key_der_file $ca_cert_pem_file $ca_cert_der_file $rsa $cert_parameters
+    generate-node-certificate $node_folder $ca_cnf_file $ca_key_pem_file $ca_cert_pem_file $node_cnf_file $node_key_pem_file $node_key_der_file $node_cert_pem_file $node_cert_der_file $node_cert_signing_request_file $rsa $cert_parameters
+}

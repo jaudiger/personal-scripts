@@ -1,0 +1,48 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+# Cleanup the computer
+def "main cleanup" [
+    --dry-run # Do not cleanup the cache directories
+]: nothing -> nothing {
+    mut args = []
+    if $dry_run {
+        $args = $args | append "--dry-run"
+    }
+
+    print "Cleaning docker tools..."
+    docker-wrapper cache cleanup ...$args
+
+    print "Cleaning helm tools..."
+    helm-wrapper cache cleanup ...$args
+
+    print "Cleaning npm tools..."
+    npm-wrapper cache cleanup ...$args
+
+    print "Cleaning C projects..."
+    c-wrapper cache cleanup --quiet ...$args
+
+    print "Cleaning Go projects..."
+    go-wrapper cache cleanup --quiet ...$args
+
+    print "Cleaning Java projects..."
+    java-wrapper cache cleanup --quiet ...$args
+
+    print "Cleaning Javascript projects..."
+    javascript-wrapper cache cleanup --quiet ...$args
+
+    print "Cleaning Rust projects..."
+    rust-wrapper cache cleanup --quiet ...$args
+
+    print "Cleaning Terraform projects..."
+    terraform-wrapper cache cleanup --quiet ...$args
+    terragrunt-wrapper cache cleanup --quiet ...$args
+
+    print "Cleaning Zig projects..."
+    zig-wrapper cache cleanup --quiet ...$args
+}
+
+def main []: nothing -> nothing {}

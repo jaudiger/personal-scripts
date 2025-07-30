@@ -1,0 +1,133 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+const HELM_CACHE_DIRECTORY = $"($nu.home-path)/.cache/helm"
+const HELM_CHART_FILE = "Chart.yaml"
+
+# Cleanup all the Helm cache directory
+def "main cache cleanup" [
+    --dry-run # Do not cleanup the cache directories
+]: nothing -> nothing {
+    if ($HELM_CACHE_DIRECTORY | path exists) {
+        if not $dry_run {
+            rm -rf $HELM_CACHE_DIRECTORY
+        }
+    }
+}
+
+# Update the Helm chart version
+def "main chart version update" [
+    --major # Update the major version
+    --minor # Update the minor version
+    --patch # Update the patch version
+    --dry-run # Do not update the version
+    --quiet # Do not print the new version
+]: nothing -> string {
+    let chart_files = glob $"**/($HELM_CHART_FILE)"
+    if ($chart_files | length) != 1 {
+        print "No or multiple Helm charts found"
+        return
+    }
+
+    let chart = open --raw $chart_files.0
+
+    # Extract the current version
+    let version = $chart
+        | parse --regex 'version: (?<major>\d+).(?<minor>\d+).(?<patch>\d+)'
+
+    mut major_version = ($version.major.0 | into int)
+    mut minor_version = ($version.minor.0 | into int)
+    mut patch_version = ($version.patch.0 | into int)
+
+    if $major {
+        $major_version = $major_version + 1
+        $minor_version = 0
+        $patch_version = 0
+    } else if $minor {
+        $minor_version = $minor_version + 1
+        $patch_version = 0
+    } else if $patch {
+        $patch_version = $patch_version + 1
+    }
+
+    if not $dry_run {
+        let new_pom = $chart
+            | str replace --regex "version: [0-9.]+" $"version: ($major_version).($minor_version).($patch_version)"
+
+        $new_pom
+            | str trim --right
+            | ($in + "\n")
+            | save --raw --force $chart_files.0
+    }
+
+    if not $quiet {
+        print $"New Helm chart version: ($major_version).($minor_version).($patch_version)"
+    }
+
+    {
+        major: $major_version,
+        minor: $minor_version,
+        patch: $patch_version
+    } | to nuon
+}
+
+# Update the Helm chart application version
+def "main chart application-version update" [
+    --major # Update the major version
+    --minor # Update the minor version
+    --patch # Update the patch version
+    --dry-run # Do not update the version
+    --quiet # Do not print the new version
+]: nothing -> string {
+    let chart_files = glob $"**/($HELM_CHART_FILE)"
+    if ($chart_files | length) != 1 {
+        print "No or multiple Helm charts found"
+        return
+    }
+
+    let chart = open --raw $chart_files.0
+
+    # Extract the current version
+    let version = $chart
+        | parse --regex 'appVersion: "v(?<major>\d+).(?<minor>\d+).(?<patch>\d+)"'
+
+    mut major_version = ($version.major.0 | into int)
+    mut minor_version = ($version.minor.0 | into int)
+    mut patch_version = ($version.patch.0 | into int)
+
+    if $major {
+        $major_version = $major_version + 1
+        $minor_version = 0
+        $patch_version = 0
+    } else if $minor {
+        $minor_version = $minor_version + 1
+        $patch_version = 0
+    } else if $patch {
+        $patch_version = $patch_version + 1
+    }
+
+    if not $dry_run {
+        let new_pom = $chart
+            | str replace --regex 'appVersion: "v[0-9.]+"' $"appVersion: \"v($major_version).($minor_version).($patch_version)\""
+
+        $new_pom
+            | str trim --right
+            | ($in + "\n")
+            | save --raw --force $chart_files.0
+    }
+
+    if not $quiet {
+        print $"New Helm chart application version: ($major_version).($minor_version).($patch_version)"
+    }
+
+    {
+        major: $major_version,
+        minor: $minor_version,
+        patch: $patch_version
+    } | to nuon
+}
+
+def main []: nothing -> nothing {}

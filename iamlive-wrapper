@@ -1,0 +1,39 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+const IAMLIVE_HOME = $"($nu.home-path)/.iamlive"
+const IAMLIVE_PROXY_PORT = 10080
+const IAMLIVE_BIND_ADDR = $"127.0.0.1:($IAMLIVE_PROXY_PORT)"
+const IAMLIVE_CA_KEY = $"($IAMLIVE_HOME)/ca.key"
+const IAMLIVE_CA_PEM = $"($IAMLIVE_HOME)/ca.pem"
+
+def --env iamlive-setup [] {
+    load-env {
+        HTTP_PROXY: $"http://($IAMLIVE_BIND_ADDR)"
+        HTTPS_PROXY: $"http://($IAMLIVE_BIND_ADDR)"
+        AWS_CA_BUNDLE: $"($IAMLIVE_HOME)/ca.pem"
+    }
+}
+
+def --env iamlive-unset [] {
+    hide-env HTTP_PROXY
+    hide-env HTTPS_PROXY
+    hide-env AWS_CA_BUNDLE
+}
+
+# Listen for AWS API calls and generate a policy
+def "main listen" []: nothing -> nothing {
+    ^iamlive --mode proxy --refresh-rate 1 --sort-alphabetical --bind-addr $IAMLIVE_BIND_ADDR --ca-bundle $IAMLIVE_CA_PEM --ca-key $IAMLIVE_CA_KEY
+}
+
+# Generate a policy from a Terraform command
+def "main terraform" [...args: any]: nothing -> nothing {
+    iamlive-setup
+    ^terraform ...$args
+    iamlive-unset
+}
+
+def main []: nothing -> nothing {}

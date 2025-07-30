@@ -1,0 +1,27 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+def start-wireshark-background [temp_dir: string]: nothing -> int {
+    # Create a task group
+    task-group add exec
+
+    task-spawn --immediate --group exec { ^tshark -i $temp_dir }
+}
+
+def stop-wireshark-background []: nothing -> nothing {
+    task-kill --group exec
+    task-clean --group exec
+    task-group remove exec
+}
+
+def main [host: string; interface: string]: nothing -> nothing {
+    let temp_dir = ^mktemp -u
+
+    ^mkfifo $temp_dir
+    start-wireshark-background $temp_dir
+    ^ssh $host $'sudo tcpdump -i ($interface) -s 0 -U -w -' o+e>| $temp_dir
+    stop-wireshark-background
+}

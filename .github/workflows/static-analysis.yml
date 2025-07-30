@@ -1,0 +1,25 @@
+name: Continuous Integration - Static Analysis
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: static-analysis-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Check linting
+        run: find . -type f -exec awk 'FNR==1 && $0=="#!/usr/bin/env bash"{printf "%s\0",FILENAME}' {} + | xargs -r0 shellcheck -o all
