@@ -29,6 +29,8 @@ const PERSONAL_REPOSITORIES = [
     {"host": "https://github.com/", "path": "jaudiger/dotfiles"},
     {"host": "https://github.com/", "path": "jaudiger/gitops-deployments"},
     {"host": "https://github.com/", "path": "jaudiger/iowa-rs"},
+    {"host": "https://github.com/", "path": "jaudiger/noalloc-slip-rs"},
+    {"host": "https://github.com/", "path": "jaudiger/noalloc-vec-rs"},
     {"host": "https://github.com/", "path": "jaudiger/personal-scripts"},
     {"host": "https://github.com/", "path": "jaudiger/personal-website"},
     {"host": "https://github.com/", "path": "jaudiger/reusable-workflows"},
