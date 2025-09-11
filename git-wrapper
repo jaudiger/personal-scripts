@@ -182,6 +182,16 @@ def git-sync [git_repo: string; quiet: bool; dry_run: bool]: nothing -> nothing 
     }
 }
 
+def git-cleanup [git_repo: string; quiet: bool; dry_run: bool]: nothing -> nothing {
+    if not $quiet {
+        print $"Cleaning up ($git_repo)..."
+    }
+
+    if not $dry_run {
+        ^git -C $git_repo gc out+err> (std null-device)
+    }
+}
+
 # Check if the current branch is in conflict with remote branches
 def "main branch conflict" [
     --mr # Add a comment on the merge request if a conflict is found
@@ -311,6 +321,19 @@ def "main repositories sync" [
         } else {
             git-sync $project.path false $dry_run
         }
+    }
+}
+
+# Cleanup all the git repositories
+def "main repositories cleanup" [
+    --dry-run # Dry run
+    --quiet # Do not print the build directories cleaned
+]: nothing -> nothing {
+    # Find all git repositories
+    let git_dirs = (^git-wrapper repositories ls) | from nuon
+
+    for repo in $git_dirs {
+        git-cleanup $repo $quiet $dry_run
     }
 }
 
