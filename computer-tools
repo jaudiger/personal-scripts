@@ -16,6 +16,9 @@ def "main cleanup" [
     print "Cleaning docker tools..."
     docker-wrapper cache cleanup ...$args
 
+    print "Cleaning git repositories..."
+    git-wrapper repositories cleanup --quiet ...$args
+
     print "Cleaning helm tools..."
     helm-wrapper cache cleanup ...$args
 
