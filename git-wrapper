@@ -362,13 +362,13 @@ def "main repository check branch" [
 
 # Commit the changes of a git repository using conventional commit
 def "main repository commit" [
-    --message(-m): string       # Message of the commit
-    --commit-type(-t): string   # Commit type
-    --commit-scope(-s): string  # Commit scope
-    --commit-breaking(-b)       # Mark commit as breaking
-    --emoji                     # Use emoji in the commit message
-    --all(-a)                   # Automatically stage all modified, newly and deleted files
-    --quiet                     # Do not print the result
+    --message(-m): string # Message of the commit
+    --commit-type(-t): string # Commit type
+    --commit-scope(-s): string # Commit scope
+    --commit-breaking(-b) # Mark commit as breaking
+    --emoji # Use emoji in the commit message
+    --all(-a) # Automatically stage all modified, newly and deleted files
+    --quiet # Do not print the result
 ] {
     const commit_type_emoticons = {
         "build": "🛠"
