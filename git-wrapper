@@ -201,7 +201,7 @@ def "main branch conflict" [
 
     let git_remote = (^git remote get-url origin)
     let git_local_branch = (^git branch --show-current | str trim)
-    let git_remote_branches = (^git branch -r | lines | each { |it| $it | str trim } | where { |it| $it != $git_local_branch and not ($it | str contains "main") and not ($it | str contains "master")})
+    let git_remote_branches = (^git branch -r | lines | each { |it| $it | str trim } | where ($it != $git_local_branch) and not ($it | str contains "main") and not ($it | str contains "master"))
     mut comments = ""
 
     # Add specific comment for merge request
@@ -287,11 +287,11 @@ def "main repositories ls" [
 
     for filter in $exclude {
         $git_dirs = $git_dirs
-            | where {|git_dir| not ($git_dir | str contains $filter)}
+            | where (not ($it | str contains $filter))
     }
 
     $git_dirs
-        | where {|git_dir| ^git -C $git_dir rev-parse --show-superproject-working-tree | is-empty}
+        | where (^git -C $it rev-parse --show-superproject-working-tree | is-empty)
         | to nuon
 }
 
