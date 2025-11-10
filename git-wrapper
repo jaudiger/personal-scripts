@@ -16,14 +16,18 @@ const GIT_DEFAULT_BRANCH = "main"
 const GIT_CLONE_DEFAULT_ARGS = ["--quiet", "--recurse-submodules", "--shallow-submodules", "-j2"]
 
 const PERSONAL_REPOSITORIES = [
+    {"host": "https://github.com/", "path": "brioche-dev/brioche"},
+    {"host": "https://github.com/", "path": "brioche-dev/brioche-packages"},
+    {"host": "https://github.com/", "path": "brioche-dev/brioche-packages-extra"},
+    {"host": "https://github.com/", "path": "brioche-dev/brioche-registry"},
+    {"host": "https://github.com/", "path": "brioche-dev/brioche-runtime-utils"},
+    {"host": "https://github.com/", "path": "brioche-dev/brioche.dev"},
+    {"host": "https://github.com/", "path": "brioche-dev/setup-brioche"},
     {"host": "https://github.com/", "path": "jaudiger/brainfuck-gui-rs"},
     {"host": "https://github.com/", "path": "jaudiger/brainfuck-rs"},
     {"host": "https://github.com/", "path": "jaudiger/brioche"},
     {"host": "https://github.com/", "path": "jaudiger/brioche-packages"},
-    {"host": "https://github.com/", "path": "jaudiger/brioche-packages-extra"},
     {"host": "https://github.com/", "path": "jaudiger/brioche-registry"},
-    {"host": "https://github.com/", "path": "jaudiger/brioche-runtime-utils"},
-    {"host": "https://github.com/", "path": "jaudiger/brioche.dev"},
     {"host": "https://github.com/", "path": "jaudiger/calculator-gui-rs"},
     {"host": "https://github.com/", "path": "jaudiger/containerized-services"},
     {"host": "https://github.com/", "path": "jaudiger/dotfiles"},
