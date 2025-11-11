@@ -25,9 +25,7 @@ const PERSONAL_REPOSITORIES = [
     {"host": "https://github.com/", "path": "brioche-dev/setup-brioche"},
     {"host": "https://github.com/", "path": "jaudiger/brainfuck-gui-rs"},
     {"host": "https://github.com/", "path": "jaudiger/brainfuck-rs"},
-    {"host": "https://github.com/", "path": "jaudiger/brioche"},
     {"host": "https://github.com/", "path": "jaudiger/brioche-packages"},
-    {"host": "https://github.com/", "path": "jaudiger/brioche-registry"},
     {"host": "https://github.com/", "path": "jaudiger/calculator-gui-rs"},
     {"host": "https://github.com/", "path": "jaudiger/containerized-services"},
     {"host": "https://github.com/", "path": "jaudiger/dotfiles"},
@@ -38,7 +36,6 @@ const PERSONAL_REPOSITORIES = [
     {"host": "https://github.com/", "path": "jaudiger/personal-scripts"},
     {"host": "https://github.com/", "path": "jaudiger/personal-website"},
     {"host": "https://github.com/", "path": "jaudiger/reusable-workflows"},
-    {"host": "https://github.com/", "path": "jaudiger/setup-brioche"},
     {"host": "https://github.com/", "path": "jaudiger/vscode-dev-containers"},
 ]
 
