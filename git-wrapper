@@ -17,6 +17,7 @@ const GIT_CLONE_DEFAULT_ARGS = ["--quiet", "--recurse-submodules", "--shallow-su
 
 const PERSONAL_REPOSITORIES = [
     {"host": "https://github.com/", "path": "brioche-dev/brioche"},
+    {"host": "https://github.com/", "path": "brioche-dev/brioche-installer"},
     {"host": "https://github.com/", "path": "brioche-dev/brioche-packages"},
     {"host": "https://github.com/", "path": "brioche-dev/brioche-packages-extra"},
     {"host": "https://github.com/", "path": "brioche-dev/brioche-registry"},
