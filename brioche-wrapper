@@ -5,8 +5,8 @@
 #
 
 const GIT_FOLDER = $"($nu.home-path)/Development/git-repositories"
-const LOCAL_BRIOCHE_REPO = "jaudiger/brioche-packages"
 const GITHUB_BRIOCHE_REPO = "brioche-dev/brioche-packages"
+const LOCAL_BRIOCHE_REPO = $GITHUB_BRIOCHE_REPO
 
 # List all the live update PRs, and review them one by one
 def "main live-update review" []: nothing -> nothing {
