@@ -1,0 +1,38 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+use mod.nu *
+
+# List all the Dependabot PRs, and review them one by one
+def "main dependabot review" []: nothing -> nothing {
+    print "Starting Dependabot PRs review..."
+
+    for repository in ($PERSONAL_REPOSITORIES | where $it.host == "https://github.com/" | get path) {
+        print $"Checking in ($repository)"
+
+        let pull_requests = ^gh pr --repo $repository list -L 100 --search "review:none author:app/dependabot" --json number | from json
+        for pull_request in $pull_requests {
+            print $"\nDiffing from PR ($pull_request.number):"
+            ^gh pr --repo $repository diff $pull_request.number
+
+            let result = input "Approve the PR and enable auto-merge [y/N]: "
+            if ($result == "y") {
+                ^gh pr --repo $repository review --approve --body "Looks good to me 🚀" $pull_request.number
+                ^gh pr --repo $repository merge --auto --delete-branch --squash $pull_request.number
+            } else {
+                let result = input "Checkout the PR locally [y/N]: "
+                if ($result == "y") {
+                    cd $"($GIT_FOLDER)/($repository)"
+                    ^gh pr --repo $repository checkout $pull_request.number
+
+                    exit
+                }
+            }
+        }
+    }
+}
+
+def main []: nothing -> nothing {}
