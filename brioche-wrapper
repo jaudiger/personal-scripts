@@ -6,27 +6,26 @@
 
 use mod.nu *
 
-const GITHUB_BRIOCHE_REPO = "brioche-dev/brioche-packages"
-const LOCAL_BRIOCHE_REPO = $GITHUB_BRIOCHE_REPO
+const BRIOCHE_REPOSITORY = "brioche-dev/brioche-packages"
 
 # List all the live update PRs, and review them one by one
 def "main live-update review" []: nothing -> nothing {
     print "Starting live-update PRs review..."
 
-    let pull_requests = ^gh pr --repo $GITHUB_BRIOCHE_REPO list -L 100 -l "live update" --search "review:none" --json number | from json
+    let pull_requests = ^gh pr --repo $BRIOCHE_REPOSITORY list -L 100 -l "live update" --search "review:none" --json number | from json
     for pull_request in $pull_requests {
         print $"\nDiffing from PR ($pull_request.number):"
-        ^gh pr --repo $GITHUB_BRIOCHE_REPO diff $pull_request.number
+        ^gh pr --repo $BRIOCHE_REPOSITORY diff $pull_request.number
 
         let result = input "Approve the PR and enable auto-merge [y/N]: "
         if ($result == "y") {
-            ^gh pr --repo $GITHUB_BRIOCHE_REPO review --approve --body "LGTM" $pull_request.number
-            ^gh pr --repo $GITHUB_BRIOCHE_REPO merge --auto $pull_request.number
+            ^gh pr --repo $BRIOCHE_REPOSITORY review --approve --body "Looks good to me 🚀" $pull_request.number
+            ^gh pr --repo $BRIOCHE_REPOSITORY merge --auto --delete-branch --squash $pull_request.number
         } else {
             let result = input "Checkout the PR locally [y/N]: "
             if ($result == "y") {
-                cd $"($GIT_FOLDER)/($LOCAL_BRIOCHE_REPO)"
-                ^gh pr --repo $GITHUB_BRIOCHE_REPO checkout $pull_request.number
+                cd $"($GIT_FOLDER)/($BRIOCHE_REPOSITORY)"
+                ^gh pr --repo $BRIOCHE_REPOSITORY checkout $pull_request.number
 
                 exit
             }
