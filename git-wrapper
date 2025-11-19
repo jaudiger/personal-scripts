@@ -4,9 +4,9 @@
 # All rights reserved.
 #
 
+use mod.nu *
 use std
 
-const GIT_FOLDER = $"($nu.home-path)/Development/git-repositories"
 const GIT_DEFAULT_BRANCH = "main"
 
 # TODO: Wait the following issues before to enable the reftable option:

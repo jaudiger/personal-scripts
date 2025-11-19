@@ -4,7 +4,7 @@
 # All rights reserved.
 #
 
-const GIT_FOLDER = $"($nu.home-path)/Development/git-repositories"
+use mod.nu *
 
 const MAVEN_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.m2"
 const POM_FILE = "pom.xml"

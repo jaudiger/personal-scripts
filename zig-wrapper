@@ -4,7 +4,7 @@
 # All rights reserved.
 #
 
-const GIT_FOLDER = $"($nu.home-path)/Development/git-repositories"
+use mod.nu *
 
 const ZIG_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.cache/zig"
 const ZIG_LOCAL_CACHE_FOLDER = ".zig-cache"

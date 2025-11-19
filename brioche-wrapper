@@ -4,7 +4,8 @@
 # All rights reserved.
 #
 
-const GIT_FOLDER = $"($nu.home-path)/Development/git-repositories"
+use mod.nu *
+
 const GITHUB_BRIOCHE_REPO = "brioche-dev/brioche-packages"
 const LOCAL_BRIOCHE_REPO = $GITHUB_BRIOCHE_REPO
 
