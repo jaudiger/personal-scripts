@@ -21,7 +21,7 @@ def "main dependabot review" []: nothing -> nothing {
             let result = input "Approve the PR and enable auto-merge [y/N]: "
             if ($result == "y") {
                 ^gh pr --repo $repository review --approve --body "Looks good to me 🚀" $pull_request.number
-                ^gh pr --repo $repository merge --auto --delete-branch --squash $pull_request.number
+                ^gh pr --repo $repository merge --delete-branch --squash $pull_request.number
             } else {
                 let result = input "Checkout the PR locally [y/N]: "
                 if ($result == "y") {
