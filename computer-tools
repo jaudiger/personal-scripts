@@ -37,6 +37,9 @@ def "main cleanup" [
     print "Cleaning Javascript projects..."
     javascript-wrapper cache cleanup --quiet ...$args
 
+    print "Cleaning Python projects..."
+    python-wrapper cache cleanup --quiet ...$args
+
     print "Cleaning Rust projects..."
     rust-wrapper cache cleanup --quiet ...$args
 
