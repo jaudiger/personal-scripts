@@ -4,7 +4,7 @@
 # All rights reserved.
 #
 
-print_usage_and_exit () {
+print_usage_and_exit() {
     echo "Usage: $0 [OPTIONS] FOLDER"
     echo "  OPTIONS:"
     echo "    -b, --backup: Backup important files"
@@ -16,7 +16,7 @@ print_usage_and_exit () {
     exit 1
 }
 
-do_backup () {
+do_backup() {
     echo "Backup important files..."
 
     local -r FOLDER=${1}
@@ -60,7 +60,7 @@ do_backup () {
     echo "Files backup into ${COMPRESSED_ARCHIVE_OUTPUT}"
 }
 
-do_restore () {
+do_restore() {
     echo "Restore files..."
 
     BACKUP_FILE=${1}
@@ -84,51 +84,51 @@ FORCE=0
 
 # Option parsing
 while [[ "$#" -gt 0 ]]; do
-  case "${1}" in
+    case "${1}" in
     -b)
         BACKUP=1
         shift 1
-    ;;
+        ;;
 
     --backup)
         BACKUP=1
         shift 1
-    ;;
+        ;;
 
     -r)
         RESTORE=1
         shift 1
-    ;;
+        ;;
 
     --restore)
         RESTORE=1
         shift 1
-    ;;
+        ;;
 
     -f)
         FORCE=1
         shift 1
-    ;;
+        ;;
 
     --force)
         FORCE=1
         shift 1
-    ;;
+        ;;
 
     --help)
         print_usage_and_exit
-    ;;
+        ;;
 
     -*)
         echo "Invalid option ${1}."
         print_usage_and_exit
-    ;;
+        ;;
 
     *)
         ARGUMENT=${1}
         break
-    ;;
-  esac
+        ;;
+    esac
 done
 
 if [[ -z "${ARGUMENT}" ]] || { [[ "${BACKUP}" = 0 ]] && [[ "${RESTORE}" = 0 ]]; }; then
@@ -142,7 +142,7 @@ if [[ ! "${ARGUMENT}" = /* ]]; then
     ARGUMENT="${CURRENT_DIR}/${ARGUMENT}"
 fi
 
-cd "${HOME}" || exit  # Go to user folder
+cd "${HOME}" || exit # Go to user folder
 
 if [[ "${BACKUP}" = 1 ]]; then
     do_backup "${ARGUMENT}"
