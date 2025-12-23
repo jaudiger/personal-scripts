@@ -6,6 +6,7 @@
 
 use mod.nu *
 
+const PNPM_CACHE_DIRECTORY = $"($nu.home-path)/.cache/pnpm"
 const PACKAGE_FILE = "package.json"
 
 # Cleanup all the build directories of the current directory recursively
@@ -14,7 +15,13 @@ def "main cache cleanup" [
     --dry-run # Do not cleanup the build directories
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
-    let build_directories = glob $"($path)/**/{dist,node_modules}"
+    if ($PNPM_CACHE_DIRECTORY | path exists) {
+        if not $dry_run {
+            rm -rf $PNPM_CACHE_DIRECTORY
+        }
+    }
+
+    let build_directories = glob $"($path)/**/{.next,.pnpm-store,dist,node_modules}"
 
     for build_directory in $build_directories {
         # Skip the directory if it is not a build directory

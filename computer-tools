@@ -22,9 +22,6 @@ def "main cleanup" [
     print "Cleaning helm tools..."
     helm-wrapper cache cleanup ...$args
 
-    print "Cleaning npm tools..."
-    npm-wrapper cache cleanup ...$args
-
     print "Cleaning C projects..."
     c-wrapper cache cleanup --quiet ...$args
 
