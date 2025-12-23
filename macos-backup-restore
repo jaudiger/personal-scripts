@@ -54,6 +54,17 @@ do_backup() {
     find Development/git-repositories -type f \( -name 'CLAUDE.md' \) -exec tar -rf "${ARCHIVE_OUTPUT}" {} +
     find Library/Application\ Support/JetBrains/**/codestyles -type f \( -iname '*.xml' -and ! -iname 'Default.xml' \) -exec tar -rf "${ARCHIVE_OUTPUT}" {} +
 
+    # Backup SSH keys (public/private pairs only)
+    find .ssh -maxdepth 1 -type f -name 'id_*' -exec tar -rf "${ARCHIVE_OUTPUT}" {} +
+
+    # Backup GPG keys using proper export commands
+    GPG_BACKUP_DIR=$(mktemp -d)
+    gpg --export --armor > "${GPG_BACKUP_DIR}/gpg-public-keys.asc"
+    gpg --export-secret-keys --armor > "${GPG_BACKUP_DIR}/gpg-secret-keys.asc"
+    gpg --export-ownertrust > "${GPG_BACKUP_DIR}/gpg-ownertrust.txt"
+    tar -rf "${ARCHIVE_OUTPUT}" -C "${GPG_BACKUP_DIR}" .
+    rm -rf "${GPG_BACKUP_DIR}"
+
     # Compress the archive
     gzip "${ARCHIVE_OUTPUT}"
 
@@ -73,6 +84,27 @@ do_restore() {
 
     # Extract the files
     tar -xf "${BACKUP_FILE}"
+
+    # Fix SSH key permissions after restore
+    if [[ -d "${HOME}/.ssh" ]]; then
+        chmod 700 "${HOME}/.ssh"
+        find "${HOME}/.ssh" -type f -name 'id_*' ! -name '*.pub' -exec chmod 600 {} +
+        find "${HOME}/.ssh" -type f -name '*.pub' -exec chmod 644 {} +
+    fi
+
+    # Restore GPG keys
+    if [[ -f "gpg-public-keys.asc" ]]; then
+        gpg --import gpg-public-keys.asc
+        rm gpg-public-keys.asc
+    fi
+    if [[ -f "gpg-secret-keys.asc" ]]; then
+        gpg --import gpg-secret-keys.asc
+        rm gpg-secret-keys.asc
+    fi
+    if [[ -f "gpg-ownertrust.txt" ]]; then
+        gpg --import-ownertrust gpg-ownertrust.txt
+        rm gpg-ownertrust.txt
+    fi
 
     echo "Files has been restored"
 }
