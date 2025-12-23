@@ -201,6 +201,205 @@ def git-cleanup [repo: string; quiet: bool; dry_run: bool]: nothing -> nothing {
     }
 }
 
+# Analyze repository and return backup reasons
+def analyze-repo-backup [repo: string]: nothing -> record {
+    # Handle edge case: no commits yet
+    let has_commits = (^git -C $repo rev-parse HEAD err> (std null-device) | complete).exit_code == 0
+
+    # Check if repository has no remotes configured
+    let no_remotes = (^git -C $repo remote | str trim) | is-empty
+
+    # Check if repository has dirty working tree
+    let dirty_files = ^git -C $repo status --porcelain | lines
+    let dirty = ($dirty_files | is-not-empty)
+
+    # Check if repository has stashes
+    let stash_list = ^git -C $repo stash list | lines
+    let stashes = ($stash_list | is-not-empty)
+
+    # Get list of local-only branches (no upstream tracking)
+    let local_only_branches = if $has_commits {
+        ^git -C $repo for-each-ref --format='%(refname:short) %(upstream)' refs/heads
+            | lines
+            | parse "{branch} {upstream}"
+            | where { $in.upstream | is-empty }
+            | get branch
+    } else { [] }
+
+    # Get list of branches ahead of their remote
+    let ahead_branches = if $has_commits {
+        ^git -C $repo for-each-ref --format='%(refname:short) %(upstream:trackshort)' refs/heads
+            | lines
+            | parse "{branch} {status}"
+            | where { $in.status | str contains ">" }
+    } else { [] }
+
+    let needs_backup = $no_remotes or $dirty or $stashes or ($local_only_branches | is-not-empty) or ($ahead_branches | is-not-empty)
+
+    # Bundle is only needed when there's local-only git data (not just stashes/dirty files)
+    let needs_bundle = $no_remotes or ($local_only_branches | is-not-empty) or ($ahead_branches | is-not-empty)
+
+    {
+        needs_backup: $needs_backup
+        needs_bundle: $needs_bundle
+        has_commits: $has_commits
+        no_remotes: $no_remotes
+        dirty: $dirty
+        dirty_files: $dirty_files
+        stashes: $stashes
+        stash_list: $stash_list
+        local_only_branches: $local_only_branches
+        ahead_branches: $ahead_branches
+    }
+}
+
+# Generate README.md content for backup
+def generate-backup-readme [repo: string, analysis: record, timestamp: string]: nothing -> string {
+    mut content = $"# Backup of ($repo)\n\n"
+    $content += $"**Original path:** `($repo)`\n"
+    $content += $"**Backup timestamp:** ($timestamp)\n\n"
+
+    $content += "## Backup Triggers\n\n"
+    if $analysis.no_remotes { $content += "- No remotes configured\n" }
+    if $analysis.dirty { $content += "- Dirty working tree\n" }
+    if $analysis.stashes { $content += "- Stashes exist\n" }
+    if ($analysis.local_only_branches | is-not-empty) { $content += "- Local-only branches\n" }
+    if ($analysis.ahead_branches | is-not-empty) { $content += "- Branches ahead of remote\n" }
+
+    if $analysis.dirty {
+        $content += "\n## Dirty Files\n\n```\n"
+        $content += ($analysis.dirty_files | str join "\n")
+        $content += "\n```\n"
+    }
+
+    if $analysis.stashes {
+        $content += "\n## Stashes\n\n```\n"
+        $content += ($analysis.stash_list | str join "\n")
+        $content += "\n```\n"
+    }
+
+    if ($analysis.local_only_branches | is-not-empty) {
+        $content += "\n## Local-only Branches\n\n"
+        for branch in $analysis.local_only_branches {
+            $content += $"- ($branch)\n"
+        }
+    }
+
+    if ($analysis.ahead_branches | is-not-empty) {
+        $content += "\n## Branches Ahead of Remote\n\n"
+        for item in $analysis.ahead_branches {
+            $content += $"- ($item.branch)\n"
+        }
+    }
+
+    $content += "\n## Restoration Instructions\n\n"
+
+    if $analysis.needs_bundle {
+        $content += "### Restore from bundle\n\n"
+        $content += "```bash\n"
+        $content += "git clone bundle.git restored-repo\n"
+        $content += "```\n\n"
+    }
+
+    if $analysis.stashes {
+        $content += "### Restore stashes\n\n"
+        $content += "```bash\n"
+        if $analysis.needs_bundle {
+            $content += "cd restored-repo\n"
+            $content += "git apply ../stash-0.patch  # Apply as working changes\n"
+        } else {
+            $content += "# Apply to existing repo clone\n"
+            $content += "git apply stash-0.patch  # Apply as working changes\n"
+        }
+        $content += "git stash                    # Re-stash if needed\n"
+        $content += "```\n\n"
+    }
+
+    if $analysis.dirty {
+        $content += "### Restore working tree changes\n\n"
+        $content += "```bash\n"
+        if $analysis.needs_bundle {
+            $content += "tar -xzf working-tree.tar.gz -C restored-repo/\n"
+        } else {
+            $content += "# Extract to existing repo clone\n"
+            $content += "tar -xzf working-tree.tar.gz -C <your-repo-path>/\n"
+        }
+        $content += "```\n"
+    }
+
+    $content
+}
+
+# Execute backup for a single repository into temp directory
+def backup-repo [
+    repo: string
+    temp_base: string
+    analysis: record
+    quiet: bool
+    dry_run: bool
+]: nothing -> nothing {
+    let timestamp = (date now | format date "%Y-%m-%d_%H-%M-%S")
+
+    # Calculate relative path for archive structure
+    let repo_path = ($repo | path expand)
+    let home = $nu.home-path
+    let relative_path = if ($repo_path | str starts-with $home) {
+        $repo_path | str replace $home "" | str trim --char "/"
+    } else {
+        $repo_path | str trim --left --char "/"
+    }
+
+    if $dry_run {
+        if $analysis.needs_bundle and $analysis.has_commits {
+            print $"  Would include: ($relative_path)/bundle.git"
+        }
+        if $analysis.dirty {
+            print $"  Would include: ($relative_path)/working-tree.tar.gz"
+        }
+        if $analysis.stashes {
+            let stash_count = ($analysis.stash_list | length)
+            print $"  Would include: ($relative_path)/stash-*.patch \(($stash_count) files\)"
+        }
+        print $"  Would include: ($relative_path)/README.md"
+        return
+    }
+
+    let temp_dir = $temp_base | path join $relative_path
+
+    if not $quiet {
+        print $"Backing up ($repo)..."
+    }
+
+    # Create temp directory
+    mkdir $temp_dir
+
+    # Create git bundle with all refs (only when there's local-only git data)
+    if $analysis.needs_bundle and $analysis.has_commits {
+        let bundle_path = $temp_dir | path join "bundle.git"
+        ^git -C $repo bundle create $bundle_path --all
+    }
+
+    # Create working tree tarball if dirty
+    if $analysis.dirty {
+        let tarball_path = $temp_dir | path join "working-tree.tar.gz"
+        ^tar -czf $tarball_path -C $repo --exclude='.git' .
+    }
+
+    # Export stashes as patches
+    if $analysis.stashes {
+        let stash_count = ($analysis.stash_list | length)
+        for i in 0..<$stash_count {
+            let patch_path = $temp_dir | path join $"stash-($i).patch"
+            ^git -C $repo stash show -p $"stash@{($i)}" | save -f $patch_path
+        }
+    }
+
+    # Generate and write README
+    let readme_content = generate-backup-readme $repo $analysis $timestamp
+    let readme_path = $temp_dir | path join "README.md"
+    $readme_content | save -f $readme_path
+}
+
 # Check if the current branch is in conflict with remote branches
 def "main branch conflict" [
     --mr # Add a comment on the merge request if a conflict is found
@@ -343,6 +542,107 @@ def "main repositories cleanup" [
 
     for repo in $git_dirs {
         git-cleanup $repo $quiet $dry_run
+    }
+}
+
+# Backup git repositories that have local-only data
+def "main repositories backup" [
+    backup_dest: path              # Destination folder for the backup archive
+    ...repo_paths: path            # Paths to git repositories (if empty, uses git-wrapper repositories ls)
+    --dry-run (-n)                 # Only report what would be backed up
+    --quiet (-q)                   # Suppress output
+    --force (-f)                   # Overwrite existing backup archive
+]: nothing -> nothing {
+    let backup_dest = $backup_dest | path expand
+    let timestamp = (date now | format date "%Y-%m-%d")
+    let archive_path = $backup_dest | path join $"git_backup_($timestamp).tar.gz"
+
+    # Check if archive already exists
+    if ($archive_path | path exists) and not $force and not $dry_run {
+        print $"Backup archive ($archive_path) already exists. Use --force to overwrite."
+        return
+    }
+
+    # Ensure backup destination exists
+    if not $dry_run {
+        mkdir $backup_dest
+    }
+
+    mut repos_to_check = []
+
+    # If no paths provided, use git-wrapper repositories ls
+    if ($repo_paths | is-empty) {
+        $repos_to_check = (^git-wrapper repositories ls) | from nuon
+    } else {
+        for path in $repo_paths {
+            let expanded_path = $path | path expand
+
+            if ($expanded_path | path join ".git" | path exists) {
+                $repos_to_check = $repos_to_check | append $expanded_path
+            } else {
+                if not $quiet {
+                    print $"Warning: ($expanded_path) is not a git repository"
+                }
+            }
+        }
+    }
+
+    if ($repos_to_check | is-empty) {
+        if not $quiet {
+            print "No git repositories found to backup."
+        }
+        return
+    }
+
+    # Create temp directory
+    let temp_dir = if $dry_run { "" } else { mktemp -d }
+
+    mut backed_up = 0
+    mut skipped = 0
+
+    for repo in $repos_to_check {
+        let analysis = analyze-repo-backup $repo
+
+        if $analysis.needs_backup {
+            if not $quiet or $dry_run {
+                print $"\nRepository: ($repo)"
+                if $analysis.no_remotes { print "  - No remotes configured" }
+                if $analysis.dirty { print $"  - Dirty: ($analysis.dirty_files | length) files" }
+                if $analysis.stashes { print $"  - Stashes: ($analysis.stash_list | length)" }
+                if ($analysis.local_only_branches | is-not-empty) {
+                    print $"  - Local-only branches: ($analysis.local_only_branches | str join ', ')"
+                }
+                if ($analysis.ahead_branches | is-not-empty) {
+                    print $"  - Ahead branches: ($analysis.ahead_branches | get branch | str join ', ')"
+                }
+            }
+
+            backup-repo $repo $temp_dir $analysis $quiet $dry_run
+            $backed_up += 1
+        } else {
+            $skipped += 1
+        }
+    }
+
+    if $backed_up > 0 and not $dry_run {
+        # Remove existing archive if force mode
+        if ($archive_path | path exists) and $force {
+            rm $archive_path
+        }
+
+        # Create tar.gz archive from temp directory
+        ^tar -czf $archive_path -C $temp_dir .
+
+        # Clean up temp directory
+        rm -rf $temp_dir
+
+        if not $quiet {
+            print $"\nBackup archive created: ($archive_path)"
+        }
+    }
+
+    if not $quiet {
+        print $"Backup complete: ($backed_up) backed up, ($skipped) skipped"
     }
 }
 
