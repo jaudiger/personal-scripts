@@ -9,9 +9,14 @@ def "main cache cleanup" [
     --dry-run # Do not cleanup the build directories
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
+    # Global cleanup
     let go_cache = ^go env GOCACHE
 
     if ($go_cache | path exists) {
+        if not $quiet {
+            print $"Cleaning global directory ($go_cache)"
+        }
+
         if not $dry_run {
             rm -rf $go_cache
         }

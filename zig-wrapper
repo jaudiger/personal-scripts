@@ -16,10 +16,10 @@ def "main cache cleanup" [
     --dry-run # Do not cleanup the build directories
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
-    # Toolings cleanup
+    # Global cleanup
     if ($ZIG_GLOBAL_CACHE_FOLDER | path exists) {
         if not $quiet {
-            print $"Cleaning Zig global cache directory ($ZIG_GLOBAL_CACHE_FOLDER)"
+            print $"Cleaning global directory ($ZIG_GLOBAL_CACHE_FOLDER)"
         }
 
         if not $dry_run {

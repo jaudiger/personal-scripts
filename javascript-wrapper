@@ -6,9 +6,13 @@
 
 use mod.nu *
 
-const NPM_CACHE_DIRECTORY = $"($nu.home-path)/.npm"
-const PNPM_STORE_CACHE_DIRECTORY = $"($nu.home-path)/.pnpm-store"
-const PNPM_CACHE_DIRECTORY = $"($nu.home-path)/.cache/pnpm"
+const NPM_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.npm"
+const PNPM_GLOBAL_STORE_FOLDER = $"($nu.home-path)/.pnpm-store"
+const PNPM_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.cache/pnpm"
+const NEXT_LOCAL_BUILD_FOLDER = ".next"
+const PNPM_LOCAL_STORE_FOLDER = ".pnpm-store"
+const JS_LOCAL_BUILD_FOLDER = "dist"
+const NODE_LOCAL_MODULES_FOLDER = "node_modules"
 const PACKAGE_FILE = "package.json"
 
 # Cleanup all the build directories of the current directory recursively
@@ -17,37 +21,37 @@ def "main cache cleanup" [
     --dry-run # Do not cleanup the build directories
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
-    # Toolings cleanup
-    if ($NPM_CACHE_DIRECTORY | path exists) {
+    # Global cleanup
+    if ($NPM_GLOBAL_CACHE_FOLDER | path exists) {
         if not $quiet {
-            print $"Cleaning NPM global cache directory ($NPM_CACHE_DIRECTORY)"
+            print $"Cleaning global directory ($NPM_GLOBAL_CACHE_FOLDER)"
         }
 
         if not $dry_run {
-            rm -rf $NPM_CACHE_DIRECTORY
+            rm -rf $NPM_GLOBAL_CACHE_FOLDER
         }
     }
-    if ($PNPM_STORE_CACHE_DIRECTORY | path exists) {
+    if ($PNPM_GLOBAL_STORE_FOLDER | path exists) {
         if not $quiet {
-            print $"Cleaning PNPM store cache directory ($PNPM_STORE_CACHE_DIRECTORY)"
+            print $"Cleaning global directory ($PNPM_GLOBAL_STORE_FOLDER)"
         }
 
         if not $dry_run {
-            rm -rf $PNPM_STORE_CACHE_DIRECTORY
+            rm -rf $PNPM_GLOBAL_STORE_FOLDER
         }
     }
-    if ($PNPM_CACHE_DIRECTORY | path exists) {
+    if ($PNPM_GLOBAL_CACHE_FOLDER | path exists) {
         if not $quiet {
-            print $"Cleaning PNPM global cache directory ($PNPM_CACHE_DIRECTORY)"
+            print $"Cleaning global directory ($PNPM_GLOBAL_CACHE_FOLDER)"
         }
 
         if not $dry_run {
-            rm -rf $PNPM_CACHE_DIRECTORY
+            rm -rf $PNPM_GLOBAL_CACHE_FOLDER
         }
     }
 
     # Local cleanup
-    let local_directories = glob $"($path)/**/{.next,.pnpm-store,dist,node_modules}"
+    let local_directories = glob $"($path)/**/{($NEXT_LOCAL_BUILD_FOLDER),($PNPM_LOCAL_STORE_FOLDER),($JS_LOCAL_BUILD_FOLDER),($NODE_LOCAL_MODULES_FOLDER)}"
 
     for local_directory in $local_directories {
         # Skip the directory if it is not part of a direct parent directory

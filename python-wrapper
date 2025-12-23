@@ -6,8 +6,8 @@
 
 use mod.nu *
 
-const TY_CACHE_FOLDER = $"($nu.home-path)/.cache/ty"
-const UV_CACHE_FOLDER = $"($nu.home-path)/.cache/uv"
+const TY_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.cache/ty"
+const UV_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.cache/uv"
 const PYTHON_LOCAL_CACHE_FOLDER = "__pycache__"
 const RUFF_LOCAL_CACHE_FOLDER = ".ruff_cache"
 const VENV_LOCAL_CACHE_FOLDER = ".venv"
@@ -18,23 +18,23 @@ def "main cache cleanup" [
     --dry-run # Do not cleanup the build directories
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
-    # Toolings cleanup
-    if ($TY_CACHE_FOLDER | path exists) {
+    # Global cleanup
+    if ($TY_GLOBAL_CACHE_FOLDER | path exists) {
         if not $quiet {
-            print $"Cleaning ty global cache directory ($TY_CACHE_FOLDER)"
+            print $"Cleaning global directory ($TY_GLOBAL_CACHE_FOLDER)"
         }
 
         if not $dry_run {
-            rm -rf $TY_CACHE_FOLDER
+            rm -rf $TY_GLOBAL_CACHE_FOLDER
         }
     }
-    if ($UV_CACHE_FOLDER | path exists) {
+    if ($UV_GLOBAL_CACHE_FOLDER | path exists) {
         if not $quiet {
-            print $"Cleaning uv global cache directory ($UV_CACHE_FOLDER)"
+            print $"Cleaning global directory ($UV_GLOBAL_CACHE_FOLDER)"
         }
 
         if not $dry_run {
-            rm -rf $UV_CACHE_FOLDER
+            rm -rf $UV_GLOBAL_CACHE_FOLDER
         }
     }
 

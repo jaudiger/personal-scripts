@@ -7,8 +7,9 @@
 use mod.nu *
 use std
 
-const CARGO_CACHE_DIRECTORY = $"($nu.home-path)/.cargo"
-const RUSTUP_CACHE_DIRECTORY = $"($nu.home-path)/.rustup"
+const CARGO_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.cargo"
+const RUSTUP_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.rustup"
+const CARGO_LOCAL_BUILD_FOLDER = "target"
 const CARGO_FILE = "Cargo.toml"
 
 # Cleanup all the build directories of the current directory recursively
@@ -17,28 +18,28 @@ def "main cache cleanup" [
     --dry-run # Do not cleanup the build directories
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
-    # Toolings cleanup
-    if ($CARGO_CACHE_DIRECTORY | path exists) {
+    # Global cleanup
+    if ($CARGO_GLOBAL_CACHE_FOLDER | path exists) {
         if not $quiet {
-            print $"Cleaning Cargo global cache directory ($CARGO_CACHE_DIRECTORY)"
+            print $"Cleaning global directory ($CARGO_GLOBAL_CACHE_FOLDER)"
         }
 
         if not $dry_run {
-            rm -r $CARGO_CACHE_DIRECTORY
+            rm -r $CARGO_GLOBAL_CACHE_FOLDER
         }
     }
-    if ($RUSTUP_CACHE_DIRECTORY | path exists) {
+    if ($RUSTUP_GLOBAL_CACHE_FOLDER | path exists) {
         if not $quiet {
-            print $"Cleaning Rustup global cache directory ($RUSTUP_CACHE_DIRECTORY)"
+            print $"Cleaning global directory ($RUSTUP_GLOBAL_CACHE_FOLDER)"
         }
 
         if not $dry_run {
-            rm -r $RUSTUP_CACHE_DIRECTORY
+            rm -r $RUSTUP_GLOBAL_CACHE_FOLDER
         }
     }
 
     # Local cleanup
-    let local_directories = glob $"($path)/**/target"
+    let local_directories = glob $"($path)/**/{($CARGO_LOCAL_BUILD_FOLDER)}"
 
     for local_directory in $local_directories {
         # Skip the directory if it is not part of a direct parent directory

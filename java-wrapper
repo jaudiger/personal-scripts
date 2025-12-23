@@ -7,6 +7,7 @@
 use mod.nu *
 
 const MAVEN_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.m2"
+const MAVEN_LOCAL_BUILD_FOLDER = "target"
 const POM_FILE = "pom.xml"
 
 # Update the main pom version of the current directory
@@ -65,10 +66,10 @@ def "main cache cleanup" [
     --dry-run # Do not cleanup the build directories
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
-    # Toolings cleanup
+    # Global cleanup
     if ($MAVEN_GLOBAL_CACHE_FOLDER | path exists) {
         if not $quiet {
-            print $"Cleaning Maven global cache directory ($MAVEN_GLOBAL_CACHE_FOLDER)"
+            print $"Cleaning global directory ($MAVEN_GLOBAL_CACHE_FOLDER)"
         }
 
         if not $dry_run {
@@ -77,7 +78,7 @@ def "main cache cleanup" [
     }
 
     # Local cleanup
-    let local_directories = glob $"($path)/**/target"
+    let local_directories = glob $"($path)/**/{($MAVEN_LOCAL_BUILD_FOLDER)}"
 
     for local_directory in $local_directories {
         # Skip the directory if it is not part of a direct parent directory

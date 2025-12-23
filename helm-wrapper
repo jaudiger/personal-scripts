@@ -4,16 +4,22 @@
 # All rights reserved.
 #
 
-const HELM_CACHE_DIRECTORY = $"($nu.home-path)/.cache/helm"
+const HELM_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.cache/helm"
 const HELM_CHART_FILE = "Chart.yaml"
 
 # Cleanup all the Helm cache directory
 def "main cache cleanup" [
     --dry-run # Do not cleanup the cache directories
+    --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
-    if ($HELM_CACHE_DIRECTORY | path exists) {
+    # Global cleanup
+    if ($HELM_GLOBAL_CACHE_FOLDER | path exists) {
+        if not $quiet {
+            print $"Cleaning global directory ($HELM_GLOBAL_CACHE_FOLDER)"
+        }
+        
         if not $dry_run {
-            rm -rf $HELM_CACHE_DIRECTORY
+            rm -rf $HELM_GLOBAL_CACHE_FOLDER
         }
     }
 }
