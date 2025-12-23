@@ -20,7 +20,7 @@ def "main cache cleanup" [
 
     for local_directory in $local_directories {
         if not $quiet {
-            print $"Cleaning the cache directory ($local_directory)"
+            print $"Cleaning the directory ($local_directory)"
         }
 
         if $dry_run {

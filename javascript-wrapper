@@ -6,6 +6,8 @@
 
 use mod.nu *
 
+const NPM_CACHE_DIRECTORY = $"($nu.home-path)/.npm"
+const PNPM_STORE_CACHE_DIRECTORY = $"($nu.home-path)/.pnpm-store"
 const PNPM_CACHE_DIRECTORY = $"($nu.home-path)/.cache/pnpm"
 const PACKAGE_FILE = "package.json"
 
@@ -16,6 +18,24 @@ def "main cache cleanup" [
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
     # Toolings cleanup
+    if ($NPM_CACHE_DIRECTORY | path exists) {
+        if not $quiet {
+            print $"Cleaning NPM global cache directory ($NPM_CACHE_DIRECTORY)"
+        }
+
+        if not $dry_run {
+            rm -rf $NPM_CACHE_DIRECTORY
+        }
+    }
+    if ($PNPM_STORE_CACHE_DIRECTORY | path exists) {
+        if not $quiet {
+            print $"Cleaning PNPM store cache directory ($PNPM_STORE_CACHE_DIRECTORY)"
+        }
+
+        if not $dry_run {
+            rm -rf $PNPM_STORE_CACHE_DIRECTORY
+        }
+    }
     if ($PNPM_CACHE_DIRECTORY | path exists) {
         if not $quiet {
             print $"Cleaning PNPM global cache directory ($PNPM_CACHE_DIRECTORY)"
