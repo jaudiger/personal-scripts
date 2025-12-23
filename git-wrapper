@@ -8,6 +8,7 @@ use mod.nu *
 use std
 
 const GIT_DEFAULT_BRANCH = "main"
+const GIT_OLD_DEFAULT_BRANCH = "master"
 
 # TODO: Wait the following issues before to enable the reftable option:
 # - https://github.com/starship/starship/issues/6086
@@ -69,7 +70,7 @@ def check-branch [repo: string; branch: string; up_to_date: bool; quiet: bool; d
         }
 
         if not $quiet {
-            print $"Current branch ($git_local_branch) of ($repo) is not the expected branch ($branch)"
+            print $"Current branch '($git_local_branch)' of ($repo) is not the expected branch '($branch)'"
         }
 
         if not $dry_run {
@@ -89,7 +90,7 @@ def check-branch [repo: string; branch: string; up_to_date: bool; quiet: bool; d
         let remote_branch = (^git -C $repo ls-remote --heads origin $git_local_branch)
         if ($remote_branch | is-empty) {
             if not $quiet {
-                print $"Remote branch ($git_local_branch) does not exist in ($repo)"
+                print $"Remote branch '($git_local_branch)' does not exist in ($repo)"
             }
 
             return true
@@ -100,7 +101,7 @@ def check-branch [repo: string; branch: string; up_to_date: bool; quiet: bool; d
 
         if ($git_local_commit != $git_remote_commit) {
             if not $quiet {
-                print $"Current branch ($git_local_branch) of ($repo) is not up to date with the remote branch"
+                print $"Current branch '($git_local_branch)' of ($repo) is not up to date with the remote branch"
             }
 
             if not $dry_run {
@@ -126,24 +127,24 @@ def gitlab-get-pr [source_branch: string]: nothing -> record {
     return {}
 }
 
-def git-clone [git_main_host: string; git_repo: string; output_folder: string; quiet: bool; dry_run: bool]: nothing -> nothing {
+def git-clone [git_main_host: string; repo: string; output_folder: string; quiet: bool; dry_run: bool]: nothing -> nothing {
     if not $quiet {
-        print $"Cloning ($git_repo)..."
+        print $"Cloning ($repo)..."
     }
 
     if not $dry_run {
-        ^git clone ...$GIT_CLONE_DEFAULT_ARGS $"($git_main_host)($git_repo).git" $output_folder
+        ^git clone ...$GIT_CLONE_DEFAULT_ARGS $"($git_main_host)($repo).git" $output_folder
     }
 }
 
-def git-clone-non-empty-folder [git_main_host: string; git_repo: string; output_folder: string; quiet: bool; dry_run: bool]: nothing -> nothing {
+def git-clone-non-empty-folder [git_main_host: string; repo: string; output_folder: string; quiet: bool; dry_run: bool]: nothing -> nothing {
     if not $quiet {
-        print $"Finish initialization of ($git_repo)..."
+        print $"Finish initialization of ($repo)..."
     }
 
     if not $dry_run {
         let temp_dir = mktemp -d
-        ^git clone ...$GIT_CLONE_DEFAULT_ARGS $"($git_main_host)($git_repo).git" $temp_dir
+        ^git clone ...$GIT_CLONE_DEFAULT_ARGS $"($git_main_host)($repo).git" $temp_dir
 
         for content in (ls -a $temp_dir) {
             ^mv $content.name $output_folder
@@ -190,13 +191,13 @@ def git-sync [repo: string; branch: bool, tag: bool, submodule: bool, quiet: boo
     }
 }
 
-def git-cleanup [git_repo: string; quiet: bool; dry_run: bool]: nothing -> nothing {
+def git-cleanup [repo: string; quiet: bool; dry_run: bool]: nothing -> nothing {
     if not $quiet {
-        print $"Cleaning up ($git_repo)..."
+        print $"Cleaning up ($repo)..."
     }
 
     if not $dry_run {
-        ^git -C $git_repo gc out+err> (std null-device)
+        ^git -C $repo gc out+err> (std null-device)
     }
 }
 
@@ -209,7 +210,7 @@ def "main branch conflict" [
 
     let git_remote = (^git remote get-url origin)
     let git_local_branch = (^git branch --show-current | str trim)
-    let git_remote_branches = (^git branch -r | lines | each { |it| $it | str trim } | where ($it != $git_local_branch) and not ($it | str contains "main") and not ($it | str contains "master"))
+    let git_remote_branches = (^git branch -r | lines | each { |it| $it | str trim } | where ($it != $git_local_branch) and not ($it | str contains $GIT_DEFAULT_BRANCH) and not ($it | str contains $GIT_OLD_DEFAULT_BRANCH))
     mut comments = ""
 
     # Add specific comment for merge request
