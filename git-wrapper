@@ -23,7 +23,7 @@ def check-uncommit [repo: string; quiet: bool; dry_run: bool]: nothing -> bool {
         }
 
         if not $dry_run {
-            let result = input "Do you want to remove the uncommitted changes [y/n]: "
+            let result = input "Do you want to remove the uncommitted changes [y/N]: "
             if ($result == "y") {
                 ^git -C $repo reset --hard
                 ^git -C $repo clean -qfd
@@ -46,7 +46,7 @@ def check-stash [repo: string; quiet: bool; dry_run: bool]: nothing -> bool {
         }
 
         if not $dry_run {
-            let result = input "Do you want to remove the stash entries [y/n]: "
+            let result = input "Do you want to remove the stash entries [y/N]: "
             if ($result == "y") {
                 ^git -C $repo stash clear
             }
@@ -68,7 +68,7 @@ def check-branch [repo: string; branch: string; up_to_date: bool; quiet: bool; d
         }
 
         if not $dry_run {
-            let result = input "Do you want to change the branch [y/n]: "
+            let result = input "Do you want to change the branch [y/N]: "
             if ($result == "y") {
                 ^git -C $repo checkout $branch
             }
@@ -99,7 +99,7 @@ def check-branch [repo: string; branch: string; up_to_date: bool; quiet: bool; d
             }
 
             if not $dry_run {
-                let result = input "Do you want to pull the changes [y/n]: "
+                let result = input "Do you want to pull the changes [y/N]: "
                 if ($result == "y") {
                     ^git -C $repo pull out+err> (std null-device)
                 }
