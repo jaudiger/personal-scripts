@@ -63,6 +63,11 @@ def check-stash [repo: string; quiet: bool; dry_run: bool]: nothing -> bool {
 def check-branch [repo: string; branch: string; up_to_date: bool; quiet: bool; dry_run: bool]: nothing -> bool {
     let git_local_branch = (^git -C $repo branch --show-current | str trim)
     if not ($git_local_branch | str contains $branch) {
+        if ($git_local_branch == $GIT_OLD_DEFAULT_BRANCH and $branch == $GIT_DEFAULT_BRANCH) {
+            # Silently handle the case where the local branch is the old default branch and the expected branch is the new default branch
+            return true
+        }
+
         if not $quiet {
             print $"Current branch ($git_local_branch) of ($repo) is not the expected branch ($branch)"
         }
