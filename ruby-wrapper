@@ -1,0 +1,29 @@
+#!/usr/bin/env nu
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+use mod.nu *
+
+const GEM_CACHE_DIRECTORY = $"($nu.home-path)/.gem"
+
+# Cleanup all the build directories of the current directory recursively
+def "main cache cleanup" [
+    --path: string=$GIT_FOLDER # The path to clean
+    --dry-run # Do not cleanup the build directories
+    --quiet # Do not print the build directories cleaned
+]: nothing -> nothing {
+    # Toolings cleanup
+    if ($GEM_CACHE_DIRECTORY | path exists) {
+        if not $quiet {
+            print $"Cleaning gem global cache directory ($GEM_CACHE_DIRECTORY)"
+        }
+
+        if not $dry_run {
+            rm -rf $GEM_CACHE_DIRECTORY
+        }
+    }
+}
+
+def main []: nothing -> nothing {}

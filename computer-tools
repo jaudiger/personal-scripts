@@ -38,6 +38,9 @@ def "main cleanup" [
     python-wrapper cache cleanup --quiet ...$args
 
     print "Cleaning Rust projects..."
+    ruby-wrapper cache cleanup --quiet ...$args
+
+    print "Cleaning Rust projects..."
     rust-wrapper cache cleanup --quiet ...$args
 
     print "Cleaning Terraform projects..."
