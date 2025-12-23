@@ -6,8 +6,11 @@
 
 use mod.nu *
 
+const TY_CACHE_FOLDER = $"($nu.home-path)/.cache/ty"
+const UV_CACHE_FOLDER = $"($nu.home-path)/.cache/uv"
 const PYTHON_LOCAL_CACHE_FOLDER = "__pycache__"
 const RUFF_LOCAL_CACHE_FOLDER = ".ruff_cache"
+const VENV_LOCAL_CACHE_FOLDER = ".venv"
 
 # Cleanup all the cache directories of the current directory recursively
 def "main cache cleanup" [
@@ -15,34 +18,39 @@ def "main cache cleanup" [
     --dry-run # Do not cleanup the build directories
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
-    # Cleanup Python local cache directory
-    let cache_directories = glob $"($path)/**/($PYTHON_LOCAL_CACHE_FOLDER)"
-
-    for cache_directory in $cache_directories {
+    # Toolings cleanup
+    if ($TY_CACHE_FOLDER | path exists) {
         if not $quiet {
-            print $"Cleaning cache directory ($cache_directory)"
+            print $"Cleaning ty global cache directory ($TY_CACHE_FOLDER)"
         }
 
-        if $dry_run {
-            continue
+        if not $dry_run {
+            rm -rf $TY_CACHE_FOLDER
+        }
+    }
+    if ($UV_CACHE_FOLDER | path exists) {
+        if not $quiet {
+            print $"Cleaning uv global cache directory ($UV_CACHE_FOLDER)"
         }
 
-        rm -r $cache_directory
+        if not $dry_run {
+            rm -rf $UV_CACHE_FOLDER
+        }
     }
 
-    # Cleanup Ruff local cache directory
-    let cache_directories = glob $"($path)/**/($RUFF_LOCAL_CACHE_FOLDER)"
+    # Local cleanup
+    let local_directories = glob $"($path)/**/{($PYTHON_LOCAL_CACHE_FOLDER),($RUFF_LOCAL_CACHE_FOLDER),($VENV_LOCAL_CACHE_FOLDER)}"
 
-    for cache_directory in $cache_directories {
+    for local_directory in $local_directories {
         if not $quiet {
-            print $"Cleaning cache directory ($cache_directory)"
+            print $"Cleaning the directory ($local_directory)"
         }
 
         if $dry_run {
             continue
         }
 
-        rm -r $cache_directory
+        rm -r $local_directory
     }
 }
 

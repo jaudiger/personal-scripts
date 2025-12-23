@@ -15,18 +15,24 @@ def "main cache cleanup" [
     --dry-run # Do not cleanup the build directories
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
+    # Toolings cleanup
     if ($PNPM_CACHE_DIRECTORY | path exists) {
+        if not $quiet {
+            print $"Cleaning PNPM global cache directory ($PNPM_CACHE_DIRECTORY)"
+        }
+
         if not $dry_run {
             rm -rf $PNPM_CACHE_DIRECTORY
         }
     }
 
-    let build_directories = glob $"($path)/**/{.next,.pnpm-store,dist,node_modules}"
+    # Local cleanup
+    let local_directories = glob $"($path)/**/{.next,.pnpm-store,dist,node_modules}"
 
-    for build_directory in $build_directories {
-        # Skip the directory if it is not a build directory
-        # (i.e. dist and node_modules are not at the root, or there is a .venv directory)
-        let stats = ($build_directory | split row '/' | uniq --count)
+    for local_directory in $local_directories {
+        # Skip the directory if it is not part of a direct parent directory
+        # (i.e. directories are not at the root, or there is a .venv directory)
+        let stats = ($local_directory | split row '/' | uniq --count)
         let dist = ($stats | find dist)
         let node_modules = ($stats | find --regex "^node_modules$")
         let venv = ($stats | find --regex "^.venv$")
@@ -41,19 +47,19 @@ def "main cache cleanup" [
         }
 
         # Skip the build directory if there is no configuration file at the root
-        if not ($"($build_directory)/../($PACKAGE_FILE)" | path exists) {
+        if not ($"($local_directory)/../($PACKAGE_FILE)" | path exists) {
             continue
         }
 
         if not $quiet {
-            print $"Cleaning build directory ($build_directory)"
+            print $"Cleaning the directory ($local_directory)"
         }
 
         if $dry_run {
             continue
         }
 
-        rm -r $build_directory
+        rm -r $local_directory
     }
 }
 

@@ -15,18 +15,19 @@ def "main cache cleanup" [
     --dry-run # Do not cleanup the cache directories
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
-    let cache_directories = glob $"($path)/**/($TERRAGRUNT_CACHE_FOLDER)"
+    # Local cleanup
+    let local_directories = glob $"($path)/**/($TERRAGRUNT_CACHE_FOLDER)"
 
-    for cache_directory in $cache_directories {
+    for local_directory in $local_directories {
         if not $quiet {
-            print $"Cleaning the cache directory ($cache_directory)"
+            print $"Cleaning the cache directory ($local_directory)"
         }
 
         if $dry_run {
             continue
         }
 
-        rm -r $cache_directory
+        rm -r $local_directory
     }
 }
 

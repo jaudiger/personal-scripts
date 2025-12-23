@@ -16,7 +16,7 @@ def "main cache cleanup" [
     --dry-run # Do not cleanup the build directories
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
-    # Cleanup Zig global cache directory
+    # Toolings cleanup
     if ($ZIG_GLOBAL_CACHE_FOLDER | path exists) {
         if not $quiet {
             print $"Cleaning Zig global cache directory ($ZIG_GLOBAL_CACHE_FOLDER)"
@@ -27,34 +27,19 @@ def "main cache cleanup" [
         }
     }
 
-    # Cleanup Zig local cache directory
-    let cache_directories = glob $"($path)/**/($ZIG_LOCAL_CACHE_FOLDER)"
+    # Local cleanup
+    let local_directories = glob $"($path)/**/{($ZIG_LOCAL_CACHE_FOLDER),($ZIG_LOCAL_BUILD_FOLDER)}"
 
-    for cache_directory in $cache_directories {
+    for local_directory in $local_directories {
         if not $quiet {
-            print $"Cleaning cache directory ($cache_directory)"
+            print $"Cleaning cache directory ($local_directory)"
         }
 
         if $dry_run {
             continue
         }
 
-        rm -r $cache_directory
-    }
-
-    # Cleanup Zig local build directory
-    let build_directories = glob $"($path)/**/($ZIG_LOCAL_BUILD_FOLDER)"
-
-    for build_directory in $build_directories {
-        if not $quiet {
-            print $"Cleaning build directory ($build_directory)"
-        }
-
-        if $dry_run {
-            continue
-        }
-
-        rm -r $build_directory
+        rm -r $local_directory
     }
 }
 

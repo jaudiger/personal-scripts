@@ -65,7 +65,7 @@ def "main cache cleanup" [
     --dry-run # Do not cleanup the build directories
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
-    # Cleanup Maven global cache directory
+    # Toolings cleanup
     if ($MAVEN_GLOBAL_CACHE_FOLDER | path exists) {
         if not $quiet {
             print $"Cleaning Maven global cache directory ($MAVEN_GLOBAL_CACHE_FOLDER)"
@@ -76,24 +76,25 @@ def "main cache cleanup" [
         }
     }
 
-    # Cleanup Maven local build directory
-    let build_directories = glob $"($path)/**/target"
+    # Local cleanup
+    let local_directories = glob $"($path)/**/target"
 
-    for build_directory in $build_directories {
-        # Skip the build directory if there is no configuration file at the root
-        if not ($"($build_directory)/../($POM_FILE)" | path exists) {
+    for local_directory in $local_directories {
+        # Skip the directory if it is not part of a direct parent directory
+        # (i.e. it is not a Maven project)
+        if not ($"($local_directory)/../($POM_FILE)" | path exists) {
             continue
         }
 
         if not $quiet {
-            print $"Cleaning build directory ($build_directory)"
+            print $"Cleaning the directory ($local_directory)"
         }
 
         if $dry_run {
             continue
         }
 
-        rm -r $build_directory
+        rm -r $local_directory
     }
 }
 

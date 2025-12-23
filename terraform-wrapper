@@ -18,25 +18,26 @@ def "main cache cleanup" [
     --dry-run # Do not cleanup the cache directories
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
-    let cache_directories = glob $"($path)/**/($TERRAFORM_CACHE_FOLDER)"
+    # Local cleanup
+    let local_directories = glob $"($path)/**/($TERRAFORM_CACHE_FOLDER)"
 
-    for cache_directory in $cache_directories {
-        # Skip the file if it is not in a root directory
-        let stats = ($cache_directory | split row '/' | uniq --count)
+    for local_directory in $local_directories {
+        # Skip the directory if it is not part of a direct parent directory
+        let stats = ($local_directory | split row '/' | uniq --count)
         let terragrunt_folder = ($stats | find --regex $"^($TERRAGRUNT_CACHE_FOLDER)$")
         if ($terragrunt_folder | is-not-empty) {
             continue
         }
 
         if not $quiet {
-            print $"Cleaning the cache directory ($cache_directory)"
+            print $"Cleaning the directory ($local_directory)"
         }
 
         if $dry_run {
             continue
         }
 
-        rm -r $cache_directory
+        rm -r $local_directory
     }
 }
 

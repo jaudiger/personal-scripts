@@ -16,6 +16,7 @@ def "main cache cleanup" [
     --dry-run # Do not cleanup the build directories
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
+    # Toolings cleanup
     if ($CARGO_LOCAL_FOLDER | path exists) {
         if not $quiet {
             print $"Cleaning Cargo local directory ($CARGO_LOCAL_FOLDER)"
@@ -26,23 +27,25 @@ def "main cache cleanup" [
         }
     }
 
-    let build_directories = glob $"($path)/**/target"
+    # Local cleanup
+    let local_directories = glob $"($path)/**/target"
 
-    for build_directory in $build_directories {
-        # Skip the build directory if there is no configuration file at the root
-        if not ($"($build_directory)/../($CARGO_FILE)" | path exists) {
+    for local_directory in $local_directories {
+        # Skip the directory if it is not part of a direct parent directory
+        # (i.e. it is not a Cargo project)
+        if not ($"($local_directory)/../($CARGO_FILE)" | path exists) {
             continue
         }
 
         if not $quiet {
-            print $"Cleaning build directory ($build_directory)"
+            print $"Cleaning the directory ($local_directory)"
         }
 
         if $dry_run {
             continue
         }
 
-        rm -r $build_directory
+        rm -r $local_directory
     }
 }
 
