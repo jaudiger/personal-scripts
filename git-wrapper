@@ -197,7 +197,7 @@ def git-cleanup [repo: string; quiet: bool; dry_run: bool]: nothing -> nothing {
     }
 
     if not $dry_run {
-        ^git -C $repo gc out+err> (std null-device)
+        ^git -C $repo maintenance run --task=gc out+err> (std null-device)
     }
 }
 
