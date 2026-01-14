@@ -19,6 +19,7 @@ def "main live-update review" []: nothing -> nothing {
 
         let result = input "Approve the PR and enable auto-merge [y/N]: "
         if ($result == "y") {
+            ^gh pr --repo $BRIOCHE_REPOSITORY edit --add-assignee @me $pull_request.number
             ^gh pr --repo $BRIOCHE_REPOSITORY review --approve --body "Looks good to me 🚀" $pull_request.number
             ^gh pr --repo $BRIOCHE_REPOSITORY merge --auto $pull_request.number
         } else {
