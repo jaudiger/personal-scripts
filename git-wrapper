@@ -10,6 +10,27 @@ use std
 const GIT_DEFAULT_BRANCH = "main"
 const GIT_OLD_DEFAULT_BRANCH = "master"
 
+# Build/cache folders based on global .gitignore patterns
+const BUILD_IGNORES = [
+    ".angular"
+    ".cache"
+    ".DS_Store"
+    ".git"
+    ".gradle"
+    ".jj"
+    ".next"
+    ".pnpm-store"
+    ".swc"
+    ".venv"
+    "build"
+    "coverage"
+    "dist"
+    "node_modules"
+    "output"
+    "target"
+    "__pycache__"
+]
+
 # TODO: Wait the following issues before to enable the reftable option:
 # - https://github.com/starship/starship/issues/6086
 # - https://github.com/zed-industries/zed/issues/14414
@@ -382,7 +403,8 @@ def backup-repo [
     # Create working tree tarball if dirty
     if $analysis.dirty {
         let tarball_path = $temp_dir | path join "working-tree.tar.gz"
-        ^tar -czf $tarball_path -C $repo --exclude='.git' .
+        let exclude_args = $BUILD_IGNORES | each { |it| $"--exclude=($it)" }
+        ^tar -czf $tarball_path -C $repo ...$exclude_args .
     }
 
     # Export stashes as patches
