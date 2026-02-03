@@ -363,7 +363,7 @@ def backup-repo [
 
     # Calculate relative path for archive structure
     let repo_path = ($repo | path expand)
-    let home = $nu.home-path
+    let home = $nu.home-dir
     let relative_path = if ($repo_path | str starts-with $home) {
         $repo_path | str replace $home "" | str trim --char "/"
     } else {

@@ -6,7 +6,7 @@
 
 use mod.nu *
 
-const ZIG_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.cache/zig"
+const ZIG_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.cache/zig"
 const ZIG_LOCAL_CACHE_FOLDER = ".zig-cache"
 const ZIG_LOCAL_BUILD_FOLDER = "zig-out"
 

@@ -7,8 +7,8 @@
 use mod.nu *
 use std
 
-const CARGO_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.cargo"
-const RUSTUP_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.rustup"
+const CARGO_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.cargo"
+const RUSTUP_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.rustup"
 const CARGO_LOCAL_BUILD_FOLDER = "target"
 const CARGO_FILE = "Cargo.toml"
 

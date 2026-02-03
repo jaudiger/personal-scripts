@@ -6,8 +6,8 @@
 
 use mod.nu *
 
-const TY_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.cache/ty"
-const UV_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.cache/uv"
+const TY_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.cache/ty"
+const UV_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.cache/uv"
 const PYTHON_LOCAL_CACHE_FOLDER = "__pycache__"
 const RUFF_LOCAL_CACHE_FOLDER = ".ruff_cache"
 const VENV_LOCAL_CACHE_FOLDER = ".venv"

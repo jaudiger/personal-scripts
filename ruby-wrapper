@@ -6,7 +6,7 @@
 
 use mod.nu *
 
-const GEM_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.gem"
+const GEM_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.gem"
 
 # Cleanup all the build directories of the current directory recursively
 def "main cache cleanup" [

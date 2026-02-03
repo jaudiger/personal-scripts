@@ -4,7 +4,7 @@
 # All rights reserved.
 #
 
-const HELM_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.cache/helm"
+const HELM_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.cache/helm"
 const HELM_CHART_FILE = "Chart.yaml"
 
 # Cleanup all the Helm cache directory

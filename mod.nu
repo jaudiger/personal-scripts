@@ -1,6 +1,6 @@
 # Global variables that are shared accross scripts
 
-export const GIT_FOLDER = $"($nu.home-path)/Development/git-repositories"
+export const GIT_FOLDER = $"($nu.home-dir)/Development/git-repositories"
 
 export const PERSONAL_REPOSITORIES = [
     {"host": "https://github.com/", "path": "brioche-dev/brioche"},

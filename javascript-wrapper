@@ -6,9 +6,9 @@
 
 use mod.nu *
 
-const NPM_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.npm"
-const PNPM_GLOBAL_STORE_FOLDER = $"($nu.home-path)/.pnpm-store"
-const PNPM_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.cache/pnpm"
+const NPM_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.npm"
+const PNPM_GLOBAL_STORE_FOLDER = $"($nu.home-dir)/.pnpm-store"
+const PNPM_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.cache/pnpm"
 const NEXT_LOCAL_BUILD_FOLDER = ".next"
 const PNPM_LOCAL_STORE_FOLDER = ".pnpm-store"
 const JS_LOCAL_BUILD_FOLDER = "dist"

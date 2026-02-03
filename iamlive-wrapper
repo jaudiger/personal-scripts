@@ -4,7 +4,7 @@
 # All rights reserved.
 #
 
-const IAMLIVE_HOME = $"($nu.home-path)/.iamlive"
+const IAMLIVE_HOME = $"($nu.home-dir)/.iamlive"
 const IAMLIVE_PROXY_PORT = 10080
 const IAMLIVE_BIND_ADDR = $"127.0.0.1:($IAMLIVE_PROXY_PORT)"
 const IAMLIVE_CA_KEY = $"($IAMLIVE_HOME)/ca.key"

@@ -6,7 +6,7 @@
 
 use mod.nu *
 
-const MAVEN_GLOBAL_CACHE_FOLDER = $"($nu.home-path)/.m2"
+const MAVEN_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.m2"
 const MAVEN_LOCAL_BUILD_FOLDER = "target"
 const POM_FILE = "pom.xml"
 
