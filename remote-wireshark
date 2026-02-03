@@ -18,7 +18,7 @@ def stop-wireshark-background []: nothing -> nothing {
 }
 
 def main [host: string; interface: string]: nothing -> nothing {
-    let temp_dir = ^mktemp -u
+    let temp_dir = mktemp --dry
 
     ^mkfifo $temp_dir
     start-wireshark-background $temp_dir
