@@ -20,6 +20,7 @@ export const PERSONAL_REPOSITORIES = [
     {"host": "https://github.com/", "path": "jaudiger/divan-bench-tools"},
     {"host": "https://github.com/", "path": "jaudiger/dotfiles"},
     {"host": "https://github.com/", "path": "jaudiger/gitops-deployments"},
+    {"host": "https://github.com/", "path": "jaudiger/hello-zigwin"},
     {"host": "https://github.com/", "path": "jaudiger/iowa-rs"},
     {"host": "https://github.com/", "path": "jaudiger/noalloc-slip-rs"},
     {"host": "https://github.com/", "path": "jaudiger/noalloc-vec-rs"},
