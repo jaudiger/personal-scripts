@@ -32,7 +32,6 @@ const BUILD_IGNORES = [
 ]
 
 # TODO: Wait the following issues before to enable the reftable option:
-# - https://github.com/starship/starship/issues/6086
 # - https://github.com/zed-industries/zed/issues/14414
 # const GIT_CLONE_DEFAULT_ARGS = ["--quiet", "--ref-format=reftable", "--recurse-submodules", "--shallow-submodules", "-j2"]
 const GIT_CLONE_DEFAULT_ARGS = ["--quiet", "--recurse-submodules", "--shallow-submodules", "-j2"]
