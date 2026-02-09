@@ -34,9 +34,9 @@ const BUILD_IGNORES = [
 ]
 
 # TODO: Wait the following issues before to enable the reftable option:
-# - https://github.com/zed-industries/zed/issues/14414
-# const GIT_CLONE_DEFAULT_ARGS = ["--quiet", "--ref-format=reftable", "--recurse-submodules", "--shallow-submodules", "-j2"]
-const GIT_CLONE_DEFAULT_ARGS = ["--quiet", "--recurse-submodules", "--shallow-submodules", "-j2"]
+# - https://github.com/zed-industries/zed/discussions/45702
+# const GIT_CLONE_DEFAULT_ARGS = ["--quiet", "--ref-format=reftable", "--filter=blob:none", "--recurse-submodules", "--also-filter-submodules", "-j2"]
+const GIT_CLONE_DEFAULT_ARGS = ["--quiet", "--filter=blob:none", "--recurse-submodules", "--also-filter-submodules", "-j2"]
 
 def check-uncommit [repo: string; quiet: bool; dry_run: bool]: nothing -> bool {
     let result = ^git -C $repo status --porcelain
@@ -180,12 +180,13 @@ def git-sync [repo: string; branch: bool, tag: bool, submodule: bool, quiet: boo
     }
 
     if not $dry_run {
-        # Handle first the tags pruning, since it'll also do a global repository fetch
-        # In case of no tags pruning, fetch normally the repository
+        # When tag sync is requested, force-update tags and prune deleted ones,
+        # which also performs a global repository fetch.
+        # Otherwise, fetch normally the repository.
         if $tag {
-            ^git -C $repo fetch --tags --prune-tags --force
+            ^git -C $repo fetch --tags --prune-tags --force out+err> (std null-device)
         } else {
-            ^git -C $repo fetch
+            ^git -C $repo fetch out+err> (std null-device)
         }
 
         if $branch {
@@ -207,7 +208,7 @@ def git-sync [repo: string; branch: bool, tag: bool, submodule: bool, quiet: boo
 
             if $needs_update {
                 ^git -C $repo submodule deinit --force . out+err> (std null-device)
-                ^git -C $repo submodule update --init --recursive --depth 1 out+err> (std null-device)
+                ^git -C $repo submodule update --init --recursive --filter=blob:none out+err> (std null-device)
             }
         }
     }
