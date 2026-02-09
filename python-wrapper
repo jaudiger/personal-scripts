@@ -9,6 +9,8 @@ use std
 
 const TY_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.cache/ty"
 const PYTHON_LOCAL_CACHE_FOLDER = "__pycache__"
+const MYPY_LOCAL_CACHE_FOLDER = ".mypy_cache"
+const PYTEST_LOCAL_CACHE_FOLDER = ".pytest_cache"
 const RUFF_LOCAL_CACHE_FOLDER = ".ruff_cache"
 const VENV_LOCAL_CACHE_FOLDER = ".venv"
 
@@ -44,7 +46,7 @@ def "main cache cleanup" [
     }
 
     # Local cleanup
-    let local_directories = glob $"($path)/**/{($PYTHON_LOCAL_CACHE_FOLDER),($RUFF_LOCAL_CACHE_FOLDER),($VENV_LOCAL_CACHE_FOLDER)}"
+    let local_directories = glob $"($path)/**/{($MYPY_LOCAL_CACHE_FOLDER),($PYTEST_LOCAL_CACHE_FOLDER),($PYTHON_LOCAL_CACHE_FOLDER),($RUFF_LOCAL_CACHE_FOLDER),($VENV_LOCAL_CACHE_FOLDER)}"
 
     for local_directory in $local_directories {
         if not $quiet {
