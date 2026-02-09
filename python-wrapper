@@ -5,9 +5,9 @@
 #
 
 use mod.nu *
+use std
 
 const TY_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.cache/ty"
-const UV_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.cache/uv"
 const PYTHON_LOCAL_CACHE_FOLDER = "__pycache__"
 const RUFF_LOCAL_CACHE_FOLDER = ".ruff_cache"
 const VENV_LOCAL_CACHE_FOLDER = ".venv"
@@ -19,6 +19,20 @@ def "main cache cleanup" [
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
     # Global cleanup
+    if not $quiet {
+        print "Pruning pip cache"
+    }
+    if not $dry_run {
+        ^pip cache purge out+err> (std null-device)
+    }
+
+    if not $quiet {
+        print "Pruning uv cache"
+    }
+    if not $dry_run {
+        ^uv cache prune out+err> (std null-device)
+    }
+
     if ($TY_GLOBAL_CACHE_FOLDER | path exists) {
         if not $quiet {
             print $"Cleaning global directory ($TY_GLOBAL_CACHE_FOLDER)"
@@ -26,15 +40,6 @@ def "main cache cleanup" [
 
         if not $dry_run {
             rm -rf $TY_GLOBAL_CACHE_FOLDER
-        }
-    }
-    if ($UV_GLOBAL_CACHE_FOLDER | path exists) {
-        if not $quiet {
-            print $"Cleaning global directory ($UV_GLOBAL_CACHE_FOLDER)"
-        }
-
-        if not $dry_run {
-            rm -rf $UV_GLOBAL_CACHE_FOLDER
         }
     }
 
