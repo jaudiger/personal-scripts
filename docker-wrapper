@@ -12,6 +12,7 @@ def "main cache cleanup" [
 ]: nothing -> nothing {
     if not $dry_run {
         ^docker system prune --force --all --volumes out+err> (std null-device)
+        ^docker scout cache prune --sboms --force out+err> (std null-device)
     }
 }
 
