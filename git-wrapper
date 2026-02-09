@@ -690,48 +690,47 @@ def "main repositories backup" [
     }
 }
 
-# Check the uncommited changes of a git repository
-def "main repository check uncommit" [
-    --quiet # Do not print the result
-]: nothing -> bool {
-    check-uncommit (pwd) $quiet true
-}
-
-# Check the stashes of a git repository
-def "main repository check stash" [
-    --quiet # Do not print the result
-]: nothing -> bool {
-    check-stash (pwd) $quiet true
-}
-
-# Check if the branch is the correct one, and up to date
-def "main repository check branch" [
-    --branch: string # Branch to check
+# Check the state of a git repository
+def "main repository check" [
+    --uncommit(-u) # Check for uncommitted changes
+    --stash(-s) # Check for stashes
+    --branch(-b): string # Check for the correct branch
     --up-to-date # Check if the branch is up to date
     --quiet # Do not print the result
-]: nothing -> bool {
-    check-branch (pwd) $branch $up_to_date $quiet true
+]: nothing -> nothing {
+    if $uncommit {
+        check-uncommit (pwd) $quiet true
+    }
+
+    if $stash {
+        check-stash (pwd) $quiet true
+    }
+
+    if ($branch | is-not-empty) {
+        check-branch (pwd) $branch $up_to_date $quiet true
+    }
 }
 
-# Sync the git repository branches
-def "main repository sync branches" [
+# Sync a git repository
+def "main repository sync" [
+    --branches(-b) # Sync branches
+    --tags(-t) # Sync tags
+    --submodules(-s) # Sync submodules
     --quiet # Do not print the result
 ]: nothing -> nothing {
-    git-sync (pwd) true false false $quiet false
+    git-sync (pwd) $branches $tags $submodules $quiet false
 }
 
-# Sync the git repository tags
-def "main repository sync tags" [
+# Cleanup a git repository
+def "main repository cleanup" [
+    --submodules(-s) # Reset submodules
     --quiet # Do not print the result
 ]: nothing -> nothing {
-    git-sync (pwd) false true false $quiet false
-}
+    git-cleanup (pwd) $quiet false
 
-# Sync the git repository submodules
-def "main repository sync submodules" [
-    --quiet # Do not print the result
-]: nothing -> nothing {
-    git-sync (pwd) false false true $quiet false
+    if $submodules {
+        git-reset-submodules (pwd) $quiet false
+    }
 }
 
 # Commit the changes of a git repository using conventional commit
