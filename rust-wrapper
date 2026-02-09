@@ -10,6 +10,7 @@ use std
 const CARGO_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.cargo"
 const RUSTUP_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.rustup"
 const CARGO_LOCAL_BUILD_FOLDER = "target"
+const WASM_LOCAL_BUILD_FOLDER = "dist"
 const CARGO_FILE = "Cargo.toml"
 
 # Cleanup all the build directories of the current directory recursively
@@ -39,7 +40,7 @@ def "main cache cleanup" [
     }
 
     # Local cleanup
-    let local_directories = glob $"($path)/**/{($CARGO_LOCAL_BUILD_FOLDER)}"
+    let local_directories = glob $"($path)/**/{($CARGO_LOCAL_BUILD_FOLDER),($WASM_LOCAL_BUILD_FOLDER)}"
 
     for local_directory in $local_directories {
         # Skip the directory if it is not part of a direct parent directory
