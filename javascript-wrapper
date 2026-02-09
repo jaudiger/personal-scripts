@@ -5,10 +5,11 @@
 #
 
 use mod.nu *
+use std
 
 const NPM_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.npm"
-const PNPM_GLOBAL_STORE_FOLDER = $"($nu.home-dir)/.pnpm-store"
 const PNPM_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.cache/pnpm"
+const TYPESCRIPT_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.cache/typescript"
 const NEXT_LOCAL_BUILD_FOLDER = ".next"
 const PNPM_LOCAL_STORE_FOLDER = ".pnpm-store"
 const JS_LOCAL_BUILD_FOLDER = "dist"
@@ -31,15 +32,6 @@ def "main cache cleanup" [
             rm -rf $NPM_GLOBAL_CACHE_FOLDER
         }
     }
-    if ($PNPM_GLOBAL_STORE_FOLDER | path exists) {
-        if not $quiet {
-            print $"Cleaning global directory ($PNPM_GLOBAL_STORE_FOLDER)"
-        }
-
-        if not $dry_run {
-            rm -rf $PNPM_GLOBAL_STORE_FOLDER
-        }
-    }
     if ($PNPM_GLOBAL_CACHE_FOLDER | path exists) {
         if not $quiet {
             print $"Cleaning global directory ($PNPM_GLOBAL_CACHE_FOLDER)"
@@ -48,6 +40,22 @@ def "main cache cleanup" [
         if not $dry_run {
             rm -rf $PNPM_GLOBAL_CACHE_FOLDER
         }
+    }
+    if ($TYPESCRIPT_GLOBAL_CACHE_FOLDER | path exists) {
+        if not $quiet {
+            print $"Cleaning global directory ($TYPESCRIPT_GLOBAL_CACHE_FOLDER)"
+        }
+
+        if not $dry_run {
+            rm -rf $TYPESCRIPT_GLOBAL_CACHE_FOLDER
+        }
+    }
+
+    if not $quiet {
+        print "Pruning pnpm store"
+    }
+    if not $dry_run {
+        ^pnpm store prune out+err> (std null-device)
     }
 
     # Local cleanup
