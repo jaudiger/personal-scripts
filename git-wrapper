@@ -213,6 +213,22 @@ def git-sync [repo: string; branch: bool, tag: bool, submodule: bool, quiet: boo
     }
 }
 
+def git-reset-submodules [repo: string; quiet: bool; dry_run: bool]: nothing -> nothing {
+    if not ($"($repo)/.gitmodules" | path exists) {
+        return
+    }
+
+    if not $quiet {
+        print $"Resetting submodules of ($repo)..."
+    }
+
+    if not $dry_run {
+        rm -rf $"($repo)/.git/modules"
+        ^git -C $repo submodule deinit --force . out+err> (std null-device)
+        ^git -C $repo submodule update --init --recursive --filter=blob:none out+err> (std null-device)
+    }
+}
+
 def git-cleanup [repo: string; quiet: bool; dry_run: bool]: nothing -> nothing {
     if not $quiet {
         print $"Cleaning up ($repo)..."
@@ -557,6 +573,7 @@ def "main repositories sync" [
 
 # Cleanup all the git repositories
 def "main repositories cleanup" [
+    --submodules(-s) # Reset submodules
     --dry-run # Dry run
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
@@ -565,6 +582,10 @@ def "main repositories cleanup" [
 
     for repo in $git_dirs {
         git-cleanup $repo $quiet $dry_run
+
+        if $submodules {
+            git-reset-submodules $repo $quiet $dry_run
+        }
     }
 }
 
