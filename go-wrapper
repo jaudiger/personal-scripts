@@ -11,17 +11,10 @@ def "main cache cleanup" [
 ]: nothing -> nothing {
     # Global cleanup
     if not $quiet {
-        print "Cleaning Go build cache"
+        print "Cleaning Go caches"
     }
     if not $dry_run {
-        ^go clean -cache
-    }
-
-    if not $quiet {
-        print "Cleaning Go module cache"
-    }
-    if not $dry_run {
-        ^go clean -modcache
+        ^go clean -cache -modcache -fuzzcache
     }
 }
 
