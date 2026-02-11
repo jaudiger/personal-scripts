@@ -194,15 +194,15 @@ def git-sync [repo: string; branch: bool, tag: bool, submodule: bool, quiet: boo
                 | lines
                 | parse "{local} {upstream}"
                 | where { $in.upstream | is-not-empty }
-                | where { |row|
+                | where {
                     (^git -C $repo show-ref --quiet $"refs/remotes/($in.upstream)" | complete).exit_code != 0
                 }
-                | each { |row|
-                    ^git -C $repo branch -D $row.local
+                | each {
+                    ^git -C $repo branch -D $in.local
                 }
         }
 
-        if $submodule and (".gitmodules" | path exists) {
+        if $submodule and ($"($repo)/.gitmodules" | path exists) {
             let submodule_status = (^git -C $repo submodule status --recursive)
             let needs_update = ($submodule_status | lines | any { |line| ($line | str starts-with "+") or ($line | str starts-with "-") })
 
