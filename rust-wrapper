@@ -7,8 +7,16 @@
 use mod.nu *
 use std
 
-const CARGO_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.cargo"
-const RUSTUP_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.rustup"
+const CARGO_GLOBAL_CACHE_FOLDERS = [
+    $"($nu.home-dir)/.cargo/registry/cache"
+    $"($nu.home-dir)/.cargo/registry/src"
+    $"($nu.home-dir)/.cargo/git/db"
+    $"($nu.home-dir)/.cargo/git/checkouts"
+]
+const RUSTUP_GLOBAL_CACHE_FOLDERS = [
+    $"($nu.home-dir)/.rustup/downloads"
+    $"($nu.home-dir)/.rustup/tmp"
+]
 const CARGO_LOCAL_BUILD_FOLDER = "target"
 const WASM_LOCAL_BUILD_FOLDER = "dist"
 const CARGO_FILE = "Cargo.toml"
@@ -20,22 +28,26 @@ def "main cache cleanup" [
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
     # Global cleanup
-    if ($CARGO_GLOBAL_CACHE_FOLDER | path exists) {
-        if not $quiet {
-            print $"Cleaning global directory ($CARGO_GLOBAL_CACHE_FOLDER)"
-        }
+    for folder in $CARGO_GLOBAL_CACHE_FOLDERS {
+        if ($folder | path exists) {
+            if not $quiet {
+                print $"Cleaning global directory ($folder)"
+            }
 
-        if not $dry_run {
-            rm -r $CARGO_GLOBAL_CACHE_FOLDER
+            if not $dry_run {
+                rm -r $folder
+            }
         }
     }
-    if ($RUSTUP_GLOBAL_CACHE_FOLDER | path exists) {
-        if not $quiet {
-            print $"Cleaning global directory ($RUSTUP_GLOBAL_CACHE_FOLDER)"
-        }
+    for folder in $RUSTUP_GLOBAL_CACHE_FOLDERS {
+        if ($folder | path exists) {
+            if not $quiet {
+                print $"Cleaning global directory ($folder)"
+            }
 
-        if not $dry_run {
-            rm -r $RUSTUP_GLOBAL_CACHE_FOLDER
+            if not $dry_run {
+                rm -r $folder
+            }
         }
     }
 

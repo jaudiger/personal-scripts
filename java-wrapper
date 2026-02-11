@@ -6,9 +6,18 @@
 
 use mod.nu *
 
-const MAVEN_GLOBAL_CACHE_FOLDER = $"($nu.home-dir)/.m2"
+const MAVEN_GLOBAL_REPOSITORY_FOLDER = $"($nu.home-dir)/.m2/repository"
+const GRADLE_GLOBAL_CACHE_FOLDERS = [
+    $"($nu.home-dir)/.gradle/caches"
+    $"($nu.home-dir)/.gradle/wrapper/dists"
+    $"($nu.home-dir)/.gradle/daemon"
+]
 const MAVEN_LOCAL_BUILD_FOLDER = "target"
+const GRADLE_LOCAL_BUILD_FOLDER = "build"
+const GRADLE_LOCAL_CACHE_FOLDER = ".gradle"
 const POM_FILE = "pom.xml"
+const GRADLE_BUILD_FILE = "build.gradle"
+const GRADLE_BUILD_KTS_FILE = "build.gradle.kts"
 
 # Update the main pom version of the current directory
 def "main pom version update" [
@@ -67,23 +76,35 @@ def "main cache cleanup" [
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
     # Global cleanup
-    if ($MAVEN_GLOBAL_CACHE_FOLDER | path exists) {
+    if ($MAVEN_GLOBAL_REPOSITORY_FOLDER | path exists) {
         if not $quiet {
-            print $"Cleaning global directory ($MAVEN_GLOBAL_CACHE_FOLDER)"
+            print $"Cleaning global directory ($MAVEN_GLOBAL_REPOSITORY_FOLDER)"
         }
 
         if not $dry_run {
-            rm -r $MAVEN_GLOBAL_CACHE_FOLDER
+            rm -r $MAVEN_GLOBAL_REPOSITORY_FOLDER
+        }
+    }
+    for folder in $GRADLE_GLOBAL_CACHE_FOLDERS {
+        if ($folder | path exists) {
+            if not $quiet {
+                print $"Cleaning global directory ($folder)"
+            }
+
+            if not $dry_run {
+                rm -r $folder
+            }
         }
     }
 
     # Local cleanup
-    let local_directories = glob $"($path)/**/{($MAVEN_LOCAL_BUILD_FOLDER)}"
+    let local_directories = glob $"($path)/**/{($MAVEN_LOCAL_BUILD_FOLDER),($GRADLE_LOCAL_BUILD_FOLDER),($GRADLE_LOCAL_CACHE_FOLDER)}"
 
     for local_directory in $local_directories {
         # Skip the directory if it is not part of a direct parent directory
-        # (i.e. it is not a Maven project)
-        if not ($"($local_directory)/../($POM_FILE)" | path exists) {
+        # (i.e. it is not a Maven or Gradle project)
+        let parent = $"($local_directory)/.."
+        if not (($parent | path join $POM_FILE | path exists) or ($parent | path join $GRADLE_BUILD_FILE | path exists) or ($parent | path join $GRADLE_BUILD_KTS_FILE | path exists)) {
             continue
         }
 
