@@ -10,7 +10,7 @@ set -euo pipefail
 case "$(uname -s)" in
     Darwin) JETBRAINS_CONFIG="Library/Application Support/JetBrains" ;;
     Linux)  JETBRAINS_CONFIG=".config/JetBrains" ;;
-    *)      echo "Unsupported OS: $(uname -s)" >&2; exit 1 ;;
+    *)      echo "Unsupported OS: $(uname -s || true)" >&2; exit 1 ;;
 esac
 
 print_usage_and_exit() {
@@ -36,7 +36,8 @@ do_backup() {
         return 1
     fi
 
-    local -r TIMESTAMP="$(date +%Y-%m-%d)"
+    local TIMESTAMP
+    TIMESTAMP="$(date +%Y-%m-%d)"
     ARCHIVE_OUTPUT="${FOLDER}/backup_${TIMESTAMP}.tar"
     local -r COMPRESSED_ARCHIVE_OUTPUT="${ARCHIVE_OUTPUT}.gz"
 
@@ -68,10 +69,10 @@ do_backup() {
     # Create archive
     tar -cf "${ARCHIVE_OUTPUT}" --files-from=<(
         printf '%s\n' "${BACKUP_FOLDERS[@]}"
-        find Development/git-repositories -type d \( -name '.claude' -o -name '.devcontainer' -o -name '.idea' -o -name '.vscode' -o -name '.zed' \) -print
-        find Development/git-repositories -type f \( -name 'CLAUDE.md' \) -print
+        find Development/git-repositories -type d \( -name '.claude' -o -name '.devcontainer' -o -name '.idea' -o -name '.vscode' -o -name '.zed' \) -print || true
+        find Development/git-repositories -type f \( -name 'CLAUDE.md' \) -print || true
         find "${JETBRAINS_CONFIG}" -type d -name codestyles -exec find {} -type f \( -iname '*.xml' -and ! -iname 'Default.xml' \) -print \; 2>/dev/null || true
-        find .ssh -maxdepth 1 -type f -name 'id_*' -print
+        find .ssh -maxdepth 1 -type f -name 'id_*' -print || true
     )
     tar -rf "${ARCHIVE_OUTPUT}" -C "${GPG_BACKUP_DIR}" .
 
@@ -190,8 +191,11 @@ fi
 if [[ -d "${ARGUMENT}" ]]; then
     ARGUMENT="$(cd "${ARGUMENT}" && pwd)"
 elif [[ -f "${ARGUMENT}" ]]; then
-    ARGUMENT="$(cd "$(dirname "${ARGUMENT}")" && pwd)/$(basename "${ARGUMENT}")"
-elif [[ ! "${ARGUMENT}" = /* ]]; then
+    _dir="$(dirname "${ARGUMENT}")"
+    _base="$(basename "${ARGUMENT}")"
+    ARGUMENT="$(cd "${_dir}" && pwd)/${_base}"
+    unset _dir _base
+elif [[ "${ARGUMENT}" != /* ]]; then
     ARGUMENT="$(pwd)/${ARGUMENT}"
 fi
 
