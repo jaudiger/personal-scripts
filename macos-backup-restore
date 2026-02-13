@@ -167,11 +167,13 @@ if [[ -z "${ARGUMENT}" ]] || { [[ "${BACKUP}" = 0 ]] && [[ "${RESTORE}" = 0 ]]; 
     print_usage_and_exit
 fi
 
-# Check if the path is relative
-if [[ ! "${ARGUMENT}" = /* ]]; then
-    CURRENT_DIR="$(pwd)"
-
-    ARGUMENT="${CURRENT_DIR}/${ARGUMENT}"
+# Resolve to absolute canonical path
+if [[ -d "${ARGUMENT}" ]]; then
+    ARGUMENT="$(cd "${ARGUMENT}" && pwd)"
+elif [[ -f "${ARGUMENT}" ]]; then
+    ARGUMENT="$(cd "$(dirname "${ARGUMENT}")" && pwd)/$(basename "${ARGUMENT}")"
+elif [[ ! "${ARGUMENT}" = /* ]]; then
+    ARGUMENT="$(pwd)/${ARGUMENT}"
 fi
 
 cd "${HOME}" || exit # Go to user folder
