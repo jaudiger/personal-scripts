@@ -48,7 +48,7 @@ do_backup() {
     )
 
     # First, archive raw folders
-    tar -czf "${ARCHIVE_OUTPUT}" "${BACKUP_FOLDERS[@]}"
+    tar -cf "${ARCHIVE_OUTPUT}" "${BACKUP_FOLDERS[@]}"
     # Then, archive files from find commands (to better handle folders with spaces)
     find Development/git-repositories -type d \( -name '.claude' -o -name '.devcontainer' -o -name '.idea' -o -name '.vscode' -o -name '.zed' \) -exec tar -rf "${ARCHIVE_OUTPUT}" {} +
     find Development/git-repositories -type f \( -name 'CLAUDE.md' \) -exec tar -rf "${ARCHIVE_OUTPUT}" {} +
