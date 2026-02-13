@@ -1,0 +1,222 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) Jérémy Audiger.
+# All rights reserved.
+#
+
+set -euo pipefail
+
+# OS-specific paths
+case "$(uname -s)" in
+    Darwin) JETBRAINS_CONFIG="Library/Application Support/JetBrains" ;;
+    Linux)  JETBRAINS_CONFIG=".config/JetBrains" ;;
+    *)      echo "Unsupported OS: $(uname -s)" >&2; exit 1 ;;
+esac
+
+print_usage_and_exit() {
+    echo "Usage: $0 [OPTIONS] FOLDER"
+    echo "  OPTIONS:"
+    echo "    -b, --backup: Backup important files"
+    echo "    -r, --restore: Restore the files"
+    echo "    -f, --force: Force mode"
+    echo "    --help: Display this help and exit"
+    echo "  FOLDER: Folder where to save or load the archive"
+
+    exit 1
+}
+
+do_backup() {
+    echo "Backup important files..."
+
+    local -r FOLDER="${1}"
+
+    # Check if the folder exists
+    if [[ ! -d "${FOLDER}" ]]; then
+        echo "Folder '${FOLDER}' does not exist"
+        return 1
+    fi
+
+    local -r TIMESTAMP="$(date +%Y-%m-%d)"
+    ARCHIVE_OUTPUT="${FOLDER}/backup_${TIMESTAMP}.tar"
+    local -r COMPRESSED_ARCHIVE_OUTPUT="${ARCHIVE_OUTPUT}.gz"
+
+    # Check if the file already exists
+    if [[ -f "${COMPRESSED_ARCHIVE_OUTPUT}" ]]; then
+        if [[ "${FORCE}" = 0 ]]; then
+            echo "Backup file ${COMPRESSED_ARCHIVE_OUTPUT} already exists"
+            return 1
+        fi
+
+        rm "${COMPRESSED_ARCHIVE_OUTPUT}"
+    fi
+
+    # Backup folders
+    BACKUP_FOLDERS=(
+        Development/vscode
+        Development/work-scripts
+    )
+
+    # Export GPG keys
+    GPG_BACKUP_DIR=$(mktemp -d)
+    (
+        umask 077
+        gpg --export --armor >"${GPG_BACKUP_DIR}/gpg-public-keys.asc"
+        gpg --export-secret-keys --armor >"${GPG_BACKUP_DIR}/gpg-secret-keys.asc"
+        gpg --export-ownertrust >"${GPG_BACKUP_DIR}/gpg-ownertrust.txt"
+    )
+
+    # Create archive
+    tar -cf "${ARCHIVE_OUTPUT}" --files-from=<(
+        printf '%s\n' "${BACKUP_FOLDERS[@]}"
+        find Development/git-repositories -type d \( -name '.claude' -o -name '.devcontainer' -o -name '.idea' -o -name '.vscode' -o -name '.zed' \) -print
+        find Development/git-repositories -type f \( -name 'CLAUDE.md' \) -print
+        find "${JETBRAINS_CONFIG}" -type d -name codestyles -exec find {} -type f \( -iname '*.xml' -and ! -iname 'Default.xml' \) -print \; 2>/dev/null || true
+        find .ssh -maxdepth 1 -type f -name 'id_*' -print
+    )
+    tar -rf "${ARCHIVE_OUTPUT}" -C "${GPG_BACKUP_DIR}" .
+
+    # Compress the archive
+    gzip "${ARCHIVE_OUTPUT}"
+
+    echo "Backup saved to ${COMPRESSED_ARCHIVE_OUTPUT}"
+}
+
+do_restore() {
+    echo "Restore files..."
+
+    BACKUP_FILE="${1}"
+
+    # Check file
+    if [[ ! -f "${BACKUP_FILE}" ]]; then
+        echo "Backup file ${BACKUP_FILE} does not exist"
+        return 1
+    fi
+
+    # Extract the files
+    tar -xf "${BACKUP_FILE}"
+
+    # Fix SSH key permissions after restore
+    if [[ -d "${HOME}/.ssh" ]]; then
+        chmod 700 "${HOME}/.ssh"
+        find "${HOME}/.ssh" -type f -name 'id_*' ! -name '*.pub' -exec chmod 600 {} +
+        find "${HOME}/.ssh" -type f -name '*.pub' -exec chmod 644 {} +
+    fi
+
+    # Move GPG files to temp directory for secure handling
+    GPG_RESTORE_DIR=$(mktemp -d)
+
+    for gpg_file in gpg-public-keys.asc gpg-secret-keys.asc gpg-ownertrust.txt; do
+        if [[ -f "${gpg_file}" ]]; then
+            mv "${gpg_file}" "${GPG_RESTORE_DIR}/"
+        fi
+    done
+
+    # Restore GPG keys from temp directory
+    if [[ -f "${GPG_RESTORE_DIR}/gpg-public-keys.asc" ]]; then
+        if gpg --import "${GPG_RESTORE_DIR}/gpg-public-keys.asc"; then
+            rm "${GPG_RESTORE_DIR}/gpg-public-keys.asc"
+        else
+            echo "WARNING: GPG public key import failed; file retained at ${GPG_RESTORE_DIR}/gpg-public-keys.asc"
+        fi
+    fi
+    if [[ -f "${GPG_RESTORE_DIR}/gpg-secret-keys.asc" ]]; then
+        if gpg --import "${GPG_RESTORE_DIR}/gpg-secret-keys.asc"; then
+            rm "${GPG_RESTORE_DIR}/gpg-secret-keys.asc"
+        else
+            echo "WARNING: GPG secret key import failed; file retained at ${GPG_RESTORE_DIR}/gpg-secret-keys.asc"
+        fi
+    fi
+    if [[ -f "${GPG_RESTORE_DIR}/gpg-ownertrust.txt" ]]; then
+        if gpg --import-ownertrust "${GPG_RESTORE_DIR}/gpg-ownertrust.txt"; then
+            rm "${GPG_RESTORE_DIR}/gpg-ownertrust.txt"
+        else
+            echo "WARNING: GPG ownertrust import failed; file retained at ${GPG_RESTORE_DIR}/gpg-ownertrust.txt"
+        fi
+    fi
+
+    echo "Files have been restored"
+}
+
+# Default values
+BACKUP=0
+RESTORE=0
+FORCE=0
+ARGUMENT=""
+
+# Option parsing
+while [[ "$#" -gt 0 ]]; do
+    case "${1}" in
+    -b | --backup)
+        BACKUP=1
+        shift 1
+        ;;
+
+    -r | --restore)
+        RESTORE=1
+        shift 1
+        ;;
+
+    -f | --force)
+        FORCE=1
+        shift 1
+        ;;
+
+    --help)
+        print_usage_and_exit
+        ;;
+
+    -*)
+        echo "Invalid option ${1}."
+        print_usage_and_exit
+        ;;
+
+    *)
+        ARGUMENT="${1}"
+        break
+        ;;
+    esac
+done
+
+if [[ "${BACKUP}" = 1 ]] && [[ "${RESTORE}" = 1 ]]; then
+    echo "Error: cannot specify both --backup and --restore"
+    print_usage_and_exit
+fi
+
+if [[ -z "${ARGUMENT}" ]] || { [[ "${BACKUP}" = 0 ]] && [[ "${RESTORE}" = 0 ]]; }; then
+    print_usage_and_exit
+fi
+
+# Resolve to absolute canonical path
+if [[ -d "${ARGUMENT}" ]]; then
+    ARGUMENT="$(cd "${ARGUMENT}" && pwd)"
+elif [[ -f "${ARGUMENT}" ]]; then
+    ARGUMENT="$(cd "$(dirname "${ARGUMENT}")" && pwd)/$(basename "${ARGUMENT}")"
+elif [[ ! "${ARGUMENT}" = /* ]]; then
+    ARGUMENT="$(pwd)/${ARGUMENT}"
+fi
+
+cd "${HOME}" || exit # Go to user folder
+
+# Cleanup handler for temporary resources
+GPG_BACKUP_DIR=""
+GPG_RESTORE_DIR=""
+ARCHIVE_OUTPUT=""
+
+cleanup() {
+    if [[ -n "${GPG_BACKUP_DIR:-}" ]] && [[ -d "${GPG_BACKUP_DIR}" ]]; then
+        rm -rf "${GPG_BACKUP_DIR}"
+    fi
+    if [[ -n "${GPG_RESTORE_DIR:-}" ]] && [[ -d "${GPG_RESTORE_DIR}" ]]; then
+        rm -rf "${GPG_RESTORE_DIR}"
+    fi
+    if [[ -n "${ARCHIVE_OUTPUT:-}" ]] && [[ -f "${ARCHIVE_OUTPUT}" ]]; then
+        rm -f "${ARCHIVE_OUTPUT}"
+    fi
+}
+trap cleanup EXIT
+
+if [[ "${BACKUP}" = 1 ]]; then
+    do_backup "${ARGUMENT}"
+else
+    do_restore "${ARGUMENT}"
+fi
