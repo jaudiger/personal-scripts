@@ -5,6 +5,7 @@ export const GIT_FOLDER = $"($nu.home-dir)/Development/git-repositories"
 export const PERSONAL_REPOSITORIES = [
     {"host": "https://github.com/", "path": "brioche-dev/brioche"},
     {"host": "https://github.com/", "path": "brioche-dev/brioche-installer"},
+    {"host": "https://github.com/", "path": "brioche-dev/brioche-merge-manager"},
     {"host": "https://github.com/", "path": "brioche-dev/brioche-packages"},
     {"host": "https://github.com/", "path": "brioche-dev/brioche-packages-extra"},
     {"host": "https://github.com/", "path": "brioche-dev/brioche-registry"},
