@@ -17,6 +17,7 @@ export const PERSONAL_REPOSITORIES = [
     {"host": "https://github.com/", "path": "jaudiger/brioche-packages"},
     {"host": "https://github.com/", "path": "jaudiger/calculator-gui-rs"},
     {"host": "https://github.com/", "path": "jaudiger/containerized-services"},
+    {"host": "https://github.com/", "path": "jaudiger/dev-containers"},
     {"host": "https://github.com/", "path": "jaudiger/distributed-job-system-rs"},
     {"host": "https://github.com/", "path": "jaudiger/divan-bench-tools"},
     {"host": "https://github.com/", "path": "jaudiger/dotfiles"},
@@ -28,5 +29,4 @@ export const PERSONAL_REPOSITORIES = [
     {"host": "https://github.com/", "path": "jaudiger/personal-scripts"},
     {"host": "https://github.com/", "path": "jaudiger/personal-website"},
     {"host": "https://github.com/", "path": "jaudiger/reusable-workflows"},
-    {"host": "https://github.com/", "path": "jaudiger/vscode-dev-containers"},
 ]
