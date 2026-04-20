@@ -573,7 +573,7 @@ def "main repositories sync" [
         } else if not ($"($GIT_FOLDER)/($project.path)/.git" | path exists) {
             git-clone-non-empty-folder $project.host $project.path $"($GIT_FOLDER)/($project.path)" false $dry_run
         } else {
-            # git-sync $"($GIT_FOLDER)/($project.path)" true true true false $dry_run
+            git-sync $"($GIT_FOLDER)/($project.path)" true true true false $dry_run
         }
     }
 }
