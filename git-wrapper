@@ -155,7 +155,7 @@ def git-clone [git_main_host: string; repo: string; output_folder: string; quiet
     }
 
     if not $dry_run {
-        ^git clone ...$GIT_CLONE_DEFAULT_ARGS $"($git_main_host)($repo).git" $output_folder
+        ^git clone ...$GIT_CLONE_DEFAULT_ARGS $"($git_main_host)($repo).git" $output_folder out+err> (std null-device)
     }
 }
 
@@ -166,11 +166,17 @@ def git-clone-non-empty-folder [git_main_host: string; repo: string; output_fold
 
     if not $dry_run {
         let temp_dir = mktemp -d
-        ^git clone ...$GIT_CLONE_DEFAULT_ARGS $"($git_main_host)($repo).git" $temp_dir
+        ^git clone ...$GIT_CLONE_DEFAULT_ARGS $"($git_main_host)($repo).git" $temp_dir out+err> (std null-device)
 
         for content in (ls -a $temp_dir) {
-            ^mv $content.name $output_folder
+            let target = $output_folder
+                | path join ($content.name | path basename)
+            if not ($target | path exists) {
+                ^mv $content.name $output_folder
+            }
         }
+
+        rm -rf $temp_dir
     }
 }
 
@@ -567,7 +573,7 @@ def "main repositories sync" [
         } else if not ($"($GIT_FOLDER)/($project.path)/.git" | path exists) {
             git-clone-non-empty-folder $project.host $project.path $"($GIT_FOLDER)/($project.path)" false $dry_run
         } else {
-            git-sync $"($GIT_FOLDER)/($project.path)" true true true false $dry_run
+            # git-sync $"($GIT_FOLDER)/($project.path)" true true true false $dry_run
         }
     }
 }
