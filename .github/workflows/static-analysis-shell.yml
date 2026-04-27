@@ -1,4 +1,4 @@
-name: Continuous Integration - Static Analysis
+name: Continuous Integration - Static Analysis (Shell)
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: static-analysis-${{ github.ref_name }}
+  group: static-analysis-shell-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
