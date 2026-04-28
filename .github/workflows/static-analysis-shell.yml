@@ -16,10 +16,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6.0.2
 
-      - name: Install system packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y shellcheck
+      - name: Install Brioche
+        uses: brioche-dev/setup-brioche@v1.5.0
+
+      - name: Install shellcheck
+        run: brioche install -r shellcheck
 
       - name: Check linting
         run: find . -type f -exec awk 'FNR==1 && $0=="#!/usr/bin/env bash"{printf "%s\0",FILENAME}' {} + | xargs -r0 shellcheck -o all
