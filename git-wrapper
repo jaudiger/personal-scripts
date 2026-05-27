@@ -141,12 +141,10 @@ def check-branch [repo: string; branch: string; up_to_date: bool; quiet: bool; d
 }
 
 def gitlab-get-pr [source_branch: string]: nothing -> record {
-    let gitlab_mr = (^glab mr list --source-branch=($source_branch) --output=json | from json)
-    if ($gitlab_mr | length) > 0 {
-        return ($gitlab_mr | get 0)
-    }
-
-    return {}
+    ^glab mr list --source-branch=$source_branch --output=json
+        | from json
+        | first
+        | default {}
 }
 
 def git-clone [git_main_host: string; repo: string; output_folder: string; quiet: bool; dry_run: bool]: nothing -> nothing {
@@ -536,15 +534,9 @@ def "main repositories ls" [
     --path: string = $GIT_FOLDER # Path to the git repositories
     --exclude: list<string> = ["build", ".terraform"] # Directories to exclude
 ]: nothing -> string {
-    mut git_dirs = glob $"($path)/**/{.git}"
+    glob $"($path)/**/{.git}"
         | path dirname
-
-    for filter in $exclude {
-        $git_dirs = $git_dirs
-            | where (not ($it | str contains $filter))
-    }
-
-    $git_dirs
+        | where { |dir| not ($exclude | any { |f| $dir | str contains $f }) }
         | where (^git -C $it rev-parse --show-superproject-working-tree | is-empty)
         | to nuon
 }
@@ -556,16 +548,10 @@ def "main repositories sync" [
     --personal # Sync only the personal repositories
     --dry-run # Dry run
 ]: nothing -> nothing {
-    mut projects = []
-
-    if ($work or $all) {
-        $projects = $projects
-            | append (git-work-wrapper repositories ls | from nuon)
-    }
-    if ($personal or $all) {
-        $projects = $projects
-            | append $PERSONAL_REPOSITORIES
-    }
+    let projects = [
+        ...(if ($work or $all) { git-work-wrapper repositories ls | from nuon } else { [] })
+        ...(if ($personal or $all) { $PERSONAL_REPOSITORIES } else { [] })
+    ]
 
     for project in $projects {
         if not ($"($GIT_FOLDER)/($project.path)" | path exists) {
@@ -769,8 +755,8 @@ def "main repository commit" [
 
     # Ensure we have the mandatory information, ask if not
     mut msg_commit_type = $commit_type
-    while ($msg_commit_type == null or $msg_commit_type == "" or (not ($msg_commit_type in $commit_type_emoticons))) {
-        $msg_commit_type = (input $"Enter the commit type: ")
+    while (($msg_commit_type | is-empty) or (not ($msg_commit_type in $commit_type_emoticons))) {
+        $msg_commit_type = (input "Enter the commit type: ")
     }
 
     mut msg_commit_scope = $commit_scope
@@ -779,12 +765,12 @@ def "main repository commit" [
     }
 
     mut msg_message = $message
-    while ($msg_message == null or $msg_message == "") {
+    while ($msg_message | is-empty) {
         $msg_message = (input "Enter commit message: ")
     }
 
     # Generate full commit message
-    let $msg_commit_scope = if ($msg_commit_scope != null and $msg_commit_scope != "") {
+    let $msg_commit_scope = if ($msg_commit_scope | is-not-empty) {
         $"\(($msg_commit_scope)\)"
     } else {
         ""

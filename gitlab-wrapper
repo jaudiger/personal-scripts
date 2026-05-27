@@ -22,7 +22,7 @@ def git_branch_info [branch_name: string]: nothing -> record {
     {
         type: ($result.type.0 | str title-case),
         issue: ($result.issues.0 | into int),
-        name: ($result.name.0 | str replace --regex "(-,_)" " " | str title-case)
+        name: ($result.name.0 | str title-case)
     }
 }
 
