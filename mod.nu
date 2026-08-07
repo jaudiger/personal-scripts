@@ -26,6 +26,7 @@ export const PERSONAL_REPOSITORIES = [
     {"host": "https://github.com/", "path": "jaudiger/hello-winxp-zig"},
     {"host": "https://github.com/", "path": "jaudiger/iowa-rs"},
     {"host": "https://github.com/", "path": "jaudiger/kube-zig"},
+    {"host": "https://github.com/", "path": "jaudiger/nixpkgs"},
     {"host": "https://github.com/", "path": "jaudiger/noalloc-slip-rs"},
     {"host": "https://github.com/", "path": "jaudiger/noalloc-vec-rs"},
     {"host": "https://github.com/", "path": "jaudiger/personal-scripts"},
