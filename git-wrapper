@@ -170,7 +170,7 @@ def git-clone-non-empty-folder [git_main_host: string; repo: string; output_fold
             let target = $output_folder
                 | path join ($content.name | path basename)
             if not ($target | path exists) {
-                ^mv $content.name $output_folder
+                mv $content.name $output_folder
             }
         }
 

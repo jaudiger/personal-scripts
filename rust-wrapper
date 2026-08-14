@@ -87,27 +87,22 @@ def "main cargo version update" [
     let package_name = $cargo
         | parse --regex 'name\s*=\s*"(?<name>[^"]+)"'
     let package_version = $cargo
-        | parse --regex 'version\s*=\s*"(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)"'
+        | parse --regex 'version\s*=\s*"(?<version>\d+\.\d+\.\d+)"'
 
     let project_name = $package_name.name.0
-    mut major_version = ($package_version.major.0 | into int)
-    mut minor_version = ($package_version.minor.0 | into int)
-    mut patch_version = ($package_version.patch.0 | into int)
-
-    if $major {
-        $major_version = $major_version + 1
-        $minor_version = 0
-        $patch_version = 0
+    let current_version = ($package_version.version.0 | into semver)
+    let new_version = if $major {
+        $current_version | semver bump major
     } else if $minor {
-        $minor_version = $minor_version + 1
-        $patch_version = 0
+        $current_version | semver bump minor
     } else if $patch {
-        $patch_version = $patch_version + 1
+        $current_version | semver bump patch
+    } else {
+        $current_version
     }
-
     if not $dry_run {
         let new_cargo = $cargo
-            | str replace --regex 'version\s*=\s*"\d+\.\d+\.\d+"' $'version = "($major_version).($minor_version).($patch_version)"'
+            | str replace --regex 'version\s*=\s*"\d+\.\d+\.\d+"' $'version = "($new_version)"'
 
         $new_cargo
             | str trim --right
@@ -119,13 +114,13 @@ def "main cargo version update" [
     }
 
     if not $quiet {
-        print $"New Cargo version: ($major_version).($minor_version).($patch_version)"
+        print $"New Cargo version: ($new_version.major).($new_version.minor).($new_version.patch)"
     }
 
     {
-        major: $major_version,
-        minor: $minor_version,
-        patch: $patch_version
+        major: $new_version.major,
+        minor: $new_version.minor,
+        patch: $new_version.patch
     } | to nuon
 }
 
