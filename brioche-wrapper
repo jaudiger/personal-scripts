@@ -7,6 +7,37 @@
 use mod.nu *
 
 const BRIOCHE_REPOSITORY = "brioche-dev/brioche-packages"
+const DEFAULT_DISCOVER_LIMIT = "30"
+
+use ./misc/brioche-helpers/mod.nu [set-quiet log die parse-limit parse-exclusions]
+use ./misc/brioche-helpers/homebrew.nu [fetch-homebrew]
+use ./misc/brioche-helpers/nixpkgs.nu [fetch-nixpkgs]
+use ./misc/brioche-helpers/arch.nu [fetch-arch]
+
+def build-default-exclusions [enabled: bool] {
+    if not $enabled { return [] }
+    let packages_dir = ($GIT_FOLDER | path join "brioche-dev" "brioche-packages" "packages" | path expand)
+    if not ($packages_dir | path exists) {
+        die $"Packages directory does not exist: ($packages_dir)"
+    }
+    log $"Building exclusion list from: ($packages_dir)"
+    let packages = ls $packages_dir | get name | path basename
+    if ($packages | is-empty) {
+        log $"No existing packages found in ($packages_dir)"
+        return []
+    }
+    log $"Found ($packages | length) existing packages to exclude"
+    $packages
+}
+
+def run-source [source: string, limit: int, exclusions: list<string>] {
+    match $source {
+        "homebrew" => (fetch-homebrew $limit $exclusions)
+        "nixpkgs" => (fetch-nixpkgs $limit $exclusions)
+        "arch" => (fetch-arch $limit $exclusions)
+        _ => []
+    }
+}
 
 # List all the live update PRs, and review them one by one
 def "main live-update review" []: nothing -> nothing {
@@ -32,6 +63,64 @@ def "main live-update review" []: nothing -> nothing {
             }
         }
     }
+}
+
+# Discover recently updated packages from supported package managers.
+def "main packages discover" [
+    --source (-s): string = "all"
+    --limit (-l): string = $DEFAULT_DISCOVER_LIMIT
+    --exclude: string = ""
+    --exclude-defaults
+    --quiet (-q)
+] {
+    if $source not-in [homebrew nixpkgs arch all] {
+        die $"Invalid source: ($source), must be homebrew, nixpkgs, arch, or all"
+    }
+    let parsed_limit = parse-limit $limit
+    set-quiet $quiet
+
+    let default_exclusions = build-default-exclusions $exclude_defaults
+    let manual_exclusions = parse-exclusions $exclude
+    let exclusions = $default_exclusions ++ $manual_exclusions
+    let sources = if $source == "all" {
+        [homebrew nixpkgs arch]
+    } else {
+        [$source]
+    }
+    log $"Starting package discovery, source=($source), limit=($parsed_limit)"
+
+    mut packages = []
+    mut failed_sources = []
+    for source_name in $sources {
+        log $"Running ($source_name) fetcher..."
+        let attempt = try {
+            {ok: true, packages: (run-source $source_name $parsed_limit $exclusions)}
+        } catch {
+            {ok: false, packages: []}
+        }
+        if $attempt.ok {
+            $packages = ($packages ++ $attempt.packages)
+        } else {
+            log $"WARNING: ($source_name) fetcher failed"
+            $failed_sources = ($failed_sources | append $source_name)
+        }
+    }
+
+    let total_found = $packages | length
+    let deduplicated = $packages | uniq-by name
+    let timestamp = date now | format date "%Y-%m-%dT%H:%M:%SZ"
+    log $"Discovery complete: ($deduplicated | length) packages after filtering"
+    {
+        packages: $deduplicated
+        metadata: {
+            total_found: $total_found
+            after_filtering: ($deduplicated | length)
+            excluded_count: ($default_exclusions | length)
+            sources_checked: $sources
+            failed_sources: $failed_sources
+            timestamp: $timestamp
+        }
+    } | to json --raw
 }
 
 def main []: nothing -> nothing {}
