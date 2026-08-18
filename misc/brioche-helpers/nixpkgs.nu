@@ -1,12 +1,61 @@
 #!/usr/bin/env nu
 
-use ./mod.nu [GITHUB_API MAX_RETRIES github-get github-raw-get github-api-error log set-quiet parse-limit parse-exclusions is-excluded detect-nixpkgs-build-type extract-nixpkgs-builder make-package-json-extended]
+use ./mod.nu [GITHUB_API MAX_RETRIES github-get github-raw-get github-api-error log die set-quiet parse-limit parse-exclusions is-excluded make-package-json]
 use ./repology.nu [fetch-repology-metadata]
 
 const DEFAULT_LIMIT = "30"
 const NIXPKGS_RAW = "https://raw.githubusercontent.com/NixOS/nixpkgs/master"
+const NIXPKGS_BLOB = "https://github.com/NixOS/nixpkgs/blob/master"
 
-export def fetch-nix-file [name: string] {
+export def detect-nixpkgs-build-type [content: string] {
+    if ($content | str contains "rustPlatform.buildRustPackage") {
+        "Rust"
+    } else if ($content | str contains "buildGoModule") {
+        "Go"
+    } else if ($content | str contains "buildNpmPackage") {
+        "npm"
+    } else if ($content =~ '(?is)python[0-9]*Packages\.buildPython(Application|Package)') {
+        "Python"
+    } else if ($content =~ '(?is)nativeBuildInputs.*cmake' or ($content | str contains "cmakeFlags")) {
+        "CMake"
+    } else if ($content =~ '(?is)nativeBuildInputs.*meson' or ($content | str contains "mesonFlags")) {
+        "Meson"
+    } else if ($content =~ '(?is)nativeBuildInputs.*autoreconfHook' or ($content | str contains "configureFlags")) {
+        "Autotools"
+    } else if (($content | str contains "buildDotnetPackage") or ($content | str contains "buildDotnetGlobalTool")) {
+        ".NET"
+    } else if ($content | str contains "stdenv.mkDerivation") {
+        "Make"
+    } else {
+        ""
+    }
+}
+
+export def extract-nixpkgs-build-deps [content: string] {
+    let blocks = try {
+        $content
+        | str replace --all --regex '(?m)#.*$' ''
+        | parse --regex '(?ms)(?:^|\n)\s*(?:nativeBuildInputs|buildInputs)\s*=\s*(?:with\s+[^;]+;\s*)?\[(?<deps>.*?)\]'
+    } catch {
+        []
+    }
+    $blocks
+    | get deps
+    | each {|deps|
+        $deps
+        | split row -r '[[:space:]]+'
+        | each {|dep|
+            $dep
+            | str trim
+            | str replace --all --regex '^[\[\](),;]+|[\[\](),;]+$' ''
+        }
+        | where {|dep| $dep =~ '^[A-Za-z_][A-Za-z0-9_+.-]*$' }
+    }
+    | flatten
+    | uniq
+}
+
+export def fetch-nix-file-info [name: string] {
     let first_two = $name | str substring 0..1
     let paths = [
         $"pkgs/by-name/($first_two)/($name)/package.nix"
@@ -16,30 +65,36 @@ export def fetch-nix-file [name: string] {
     ]
     for path in $paths {
         let content = try { github-raw-get $"($NIXPKGS_RAW)/($path)" } catch { null }
-        if $content != null { return $content }
+        if $content != null { return {path: $path content: $content} }
     }
     null
+}
+
+def fetch-nix-file [name: string] {
+    let file = fetch-nix-file-info $name
+    if $file == null { null } else { $file.content }
 }
 
 export def fetch-nixpkgs [limit: int, exclusions: list<string>] {
     log "Fetching Nixpkgs commits..."
     let commits_url = $"($GITHUB_API)/repos/NixOS/nixpkgs/commits?per_page=($limit)&sha=master"
-    mut commits = null
+    mut commits = []
     mut attempt = 0
     mut delay = 2
 
     loop {
-        let response = try { github-get $commits_url } catch { null }
+        let response = try { github-get $commits_url } catch {|error|
+            let message = $error.msg? | default ($error.rendered? | default "unknown error")
+            die $"Failed to fetch Nixpkgs commits: ($message)"
+        }
         if $response == null {
-            log "WARNING: Failed to fetch Nixpkgs commits"
-            return []
+            die "Failed to fetch Nixpkgs commits"
         }
         let api_error = github-api-error $response
         if $api_error.rate_limited {
             $attempt += 1
             if $attempt >= $MAX_RETRIES {
-                log $"WARNING: GitHub API rate limit reached for Nixpkgs after ($MAX_RETRIES) attempts"
-                return []
+                die $"GitHub API rate limit reached for Nixpkgs after ($MAX_RETRIES) attempts"
             }
             log $"Rate limited fetching Nixpkgs commits, retry ($attempt)/($MAX_RETRIES) after ($delay)s..."
             sleep ($delay * 1sec)
@@ -47,8 +102,7 @@ export def fetch-nixpkgs [limit: int, exclusions: list<string>] {
             continue
         }
         if not ($api_error.message | is-empty) {
-            log $"WARNING: GitHub API error for Nixpkgs: ($api_error.message)"
-            return []
+            die $"GitHub API error for Nixpkgs: ($api_error.message)"
         }
         $commits = $response
         break
@@ -76,18 +130,22 @@ export def fetch-nixpkgs [limit: int, exclusions: list<string>] {
         let updated_version = try { $message | parse --regex '->\s*(?P<version>[0-9]+\.[0-9]+[0-9a-zA-Z._-]*)' | first } catch { null }
         if $updated_version != null { $version = $updated_version.version }
 
-        log $"Fetching .nix file for: ($name)"
-        let nix_content = fetch-nix-file $name
+        log $"Fetching details for: ($name)"
+        let nix_file = fetch-nix-file-info $name
+        let nix_content = if $nix_file == null { null } else { $nix_file.content }
         mut build_type = "Make"
-        mut confidence = "low"
-        mut builder = ""
+        mut build_deps = []
+        mut recipe = {}
         if $nix_content != null and not ($nix_content | is-empty) {
             $build_type = detect-nixpkgs-build-type $nix_content
-            $builder = extract-nixpkgs-builder $nix_content
-            if not ($build_type | is-empty) {
-                $confidence = "high"
-            } else {
+            if ($build_type | is-empty) {
                 $build_type = "Make"
+            }
+            $build_deps = extract-nixpkgs-build-deps $nix_content
+            $recipe = {
+                url: $"($NIXPKGS_BLOB)/($nix_file.path)"
+                type: $build_type
+                build_deps: $build_deps
             }
         } else if ($message =~ '(?i)rust|cargo') {
             $build_type = "Rust"
@@ -106,7 +164,7 @@ export def fetch-nixpkgs [limit: int, exclusions: list<string>] {
         let metadata = try { fetch-repology-metadata $name "nix" "guess_repo" } catch { {description: "", repository: ""} }
         let description = $metadata.description? | default ""
         let repository = $metadata.repository? | default ""
-        $packages = ($packages | append (make-package-json-extended $name "nixpkgs" $build_type $version $description $repository $confidence [] "" $builder))
+        $packages = ($packages | append (make-package-json $name "nixpkgs" $version $description $repository {nixpkgs: $recipe}))
         $count += 1
     }
     log $"Fetched ($count) packages from Nixpkgs"

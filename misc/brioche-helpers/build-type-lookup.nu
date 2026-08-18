@@ -1,10 +1,14 @@
 #!/usr/bin/env nu
 
-use ./mod.nu [api-get github-raw-get log set-quiet detect-build-type detect-homebrew-build-type extract-homebrew-build-command detect-nixpkgs-build-type extract-nixpkgs-builder]
+use ./mod.nu [api-get github-raw-get log set-quiet detect-build-type]
+use ./homebrew.nu [detect-homebrew-build-type]
+use ./nixpkgs.nu [fetch-nix-file-info detect-nixpkgs-build-type extract-nixpkgs-build-deps]
 
 const HOMEBREW_RAW = "https://raw.githubusercontent.com/Homebrew/homebrew-core/master/Formula"
-const NIXPKGS_RAW = "https://raw.githubusercontent.com/NixOS/nixpkgs/master"
+const HOMEBREW_BLOB = "https://github.com/Homebrew/homebrew-core/blob/master/Formula"
+const NIXPKGS_BLOB = "https://github.com/NixOS/nixpkgs/blob/master"
 const ARCH_API = "https://archlinux.org/packages/search/json"
+const ARCH_PACKAGE = "https://archlinux.org/packages"
 const BREW_API = "https://formulae.brew.sh/api"
 
 export def fetch-homebrew-info [name: string] {
@@ -12,38 +16,28 @@ export def fetch-homebrew-info [name: string] {
     let formula = try { github-raw-get $"($HOMEBREW_RAW)/($first_letter)/($name).rb" } catch { "" }
     if ($formula | is-empty) { return {} }
 
-    let build_type = detect-homebrew-build-type $formula
-    let build_command = extract-homebrew-build-command $formula
+    let detected_type = detect-homebrew-build-type $formula
     let api = try { api-get $"($BREW_API)/formula/($name).json" } catch { null }
     let build_deps = if $api == null {
         []
     } else {
         $api.build_dependencies? | default []
     }
-    let runtime_deps = if $api == null {
-        []
+    let deps = if $api == null {
+        ""
     } else {
-        $api.dependencies? | default []
+        let runtime_deps = $api.dependencies? | default []
+        ($build_deps ++ $runtime_deps) | str join ","
     }
-    let deps = ($build_deps ++ $runtime_deps) | str join ","
-    mut resolved_type = $build_type
-    mut confidence = "high"
-    if ($resolved_type | is-empty) {
-        $resolved_type = detect-build-type $deps
-        $confidence = "medium"
+    let build_type = if ($detected_type | is-empty) {
+        detect-build-type $deps
     } else {
-        $confidence = "very_high"
+        $detected_type
     }
     {
-        build_type: $resolved_type
-        confidence: $confidence
-        build_command: (if ($build_command | is-empty) {
-            null
-        } else {
-            $build_command
-        })
+        url: $"($HOMEBREW_BLOB)/($first_letter)/($name).rb"
+        type: $build_type
         build_deps: $build_deps
-        runtime_deps: $runtime_deps
     }
 }
 
@@ -52,34 +46,33 @@ export def fetch-arch-info [name: string] {
     let package = $response.results? | default [] | where pkgname == $name | first
     if $package == null { return {} }
     let makedepends = $package.makedepends? | default []
+    let repo = $package.repo? | default ""
+    let arch = $package.arch? | default ""
+    let package_name = $package.pkgname? | default $name
+    let package_url = if ($repo | is-empty) or ($arch | is-empty) {
+        null
+    } else {
+        $"($ARCH_PACKAGE)/($repo)/($arch)/($package_name)/"
+    }
     {
-        build_type: (detect-build-type ($makedepends | str join ","))
-        confidence: "high"
-        makedepends: $makedepends
+        url: $package_url
+        type: (detect-build-type ($makedepends | str join ","))
+        build_deps: $makedepends
     }
 }
 
 export def fetch-nixpkgs-info [name: string] {
-    let first_two = $name | str substring 0..1
-    let path = $"pkgs/by-name/($first_two)/($name)/package.nix"
-    let content = try { github-raw-get $"($NIXPKGS_RAW)/($path)" } catch { "" }
-    if ($content | is-empty) { return {} }
+    let file = fetch-nix-file-info $name
+    if $file == null { return {} }
+    let content = $file.content
     mut build_type = detect-nixpkgs-build-type $content
-    let builder = extract-nixpkgs-builder $content
-    mut confidence = "high"
     if ($build_type | is-empty) {
         $build_type = "Make"
-        $confidence = "low"
     }
     {
-        build_type: $build_type
-        confidence: $confidence
-        builder: (if ($builder | is-empty) {
-            null
-        } else {
-            $builder
-        })
-        path: $path
+        url: $"($NIXPKGS_BLOB)/($file.path)"
+        type: $build_type
+        build_deps: (extract-nixpkgs-build-deps $content)
     }
 }
 
@@ -93,14 +86,14 @@ def main [name: string] {
     log "Fetching Nixpkgs info..."
     let nixpkgs = fetch-nixpkgs-info $name
 
-    let available = [$homebrew $nixpkgs $arch] | where {|source| ($source.build_type? | default "") != "" }
-    let types = $available | get build_type
-    let recommended = if not ($homebrew.build_type? | default "" | is-empty) {
-        $homebrew.build_type
-    } else if not ($nixpkgs.build_type? | default "" | is-empty) {
-        $nixpkgs.build_type
-    } else if not ($arch.build_type? | default "" | is-empty) {
-        $arch.build_type
+    let available = [$homebrew $nixpkgs $arch] | where {|source| ($source.type? | default "") != "" }
+    let types = $available | get type
+    let recommended = if not ($homebrew.type? | default "" | is-empty) {
+        $homebrew.type
+    } else if not ($nixpkgs.type? | default "" | is-empty) {
+        $nixpkgs.type
+    } else if not ($arch.type? | default "" | is-empty) {
+        $arch.type
     } else {
         null
     }

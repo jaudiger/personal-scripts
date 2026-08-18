@@ -1,10 +1,11 @@
 #!/usr/bin/env nu
 
-use ./mod.nu [api-get api-get-raw log set-quiet parse-limit parse-exclusions is-excluded detect-build-type-with-confidence make-package-json-extended]
+use ./mod.nu [api-get api-get-raw log die set-quiet parse-limit parse-exclusions is-excluded detect-build-type make-package-json]
 use ./repology.nu [repology-guess-repository]
 
 const ARCH_RSS_FEED = "https://archlinux.org/feeds/packages/"
 const ARCH_API = "https://archlinux.org/packages/search/json"
+const ARCH_PACKAGE = "https://archlinux.org/packages"
 const DEFAULT_LIMIT = "30"
 
 def xml-text [node: record] {
@@ -14,7 +15,7 @@ def xml-text [node: record] {
     | str join ""
 }
 
-export def parse-rss-feed [rss_content: string] {
+def parse-rss-feed [rss_content: string] {
     let document = try { $rss_content | from xml } catch { return [] }
     let channel = $document.content | where tag == "channel" | first
     if $channel == null { return [] }
@@ -62,9 +63,9 @@ export def parse-rss-feed [rss_content: string] {
 
 export def fetch-arch [limit: int, exclusions: list<string>] {
     log "Fetching Arch Linux RSS feed..."
-    let rss_content = try { api-get-raw $ARCH_RSS_FEED } catch {
-        log "WARNING: Failed to fetch Arch RSS feed"
-        return []
+    let rss_content = try { api-get-raw $ARCH_RSS_FEED } catch {|error|
+        let message = $error.msg? | default ($error.rendered? | default "unknown error")
+        die $"Failed to fetch Arch RSS feed: ($message)"
     }
     let entries = parse-rss-feed ($rss_content | into string)
     if ($entries | is-empty) {
@@ -92,17 +93,20 @@ export def fetch-arch [limit: int, exclusions: list<string>] {
         mut url = ""
         mut build_deps = []
         mut build_type = "Make"
-        mut confidence = "low"
+        mut recipe_url = ""
         if $api_json != null {
             let result = $api_json.results? | default [] | first
             if $result != null {
                 $url = $result.url? | default ""
                 $build_deps = $result.makedepends? | default []
                 if not ($build_deps | is-empty) {
-                    let type_confidence = detect-build-type-with-confidence ($build_deps | str join ",")
-                    let parts = $type_confidence | split row ":"
-                    $build_type = $parts | get 0
-                    $confidence = $parts | get 1
+                    $build_type = detect-build-type ($build_deps | str join ",")
+                }
+                let repo = $result.repo? | default ""
+                let arch = $result.arch? | default ""
+                let package_name = $result.pkgname? | default $name
+                if not ($repo | is-empty) and not ($arch | is-empty) {
+                    $recipe_url = $"($ARCH_PACKAGE)/($repo)/($arch)/($package_name)/"
                 }
             }
         }
@@ -110,7 +114,16 @@ export def fetch-arch [limit: int, exclusions: list<string>] {
             let guessed = repology-guess-repository $name
             if not ($guessed | is-empty) { $url = $guessed }
         }
-        $packages = ($packages | append (make-package-json-extended $name "arch" $build_type $entry.version $entry.description $url $confidence $build_deps "" ""))
+        let recipe = if ($recipe_url | is-empty) {
+            {}
+        } else {
+            {
+                url: $recipe_url
+                type: $build_type
+                build_deps: $build_deps
+            }
+        }
+        $packages = ($packages | append (make-package-json $name "arch" $entry.version $entry.description $url {arch: $recipe}))
         $count += 1
     }
     log $"Fetched ($count) packages from Arch Linux"

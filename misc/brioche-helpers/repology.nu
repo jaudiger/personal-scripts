@@ -5,7 +5,7 @@ use ./mod.nu [github-get log]
 export const REPOLOGY_API = "https://repology.org/api/v1"
 export const REPOLOGY_USER_AGENT = "brioche-packages/1.0 (https://github.com/brioche-dev/brioche-packages)"
 
-export def repology-fetch-project [project: string] {
+def repology-fetch-project [project: string] {
     let url = $"($REPOLOGY_API)/project/($project)"
     let response = try {
         http get --headers {"User-Agent": $REPOLOGY_USER_AGENT} $url
@@ -13,14 +13,15 @@ export def repology-fetch-project [project: string] {
         log $"WARNING: Failed to fetch Repology data for: ($project)"
         return null
     }
-    if (($response | describe) != "list") {
+    let response_type = $response | describe
+    if not ($response_type == "list" or ($response_type | str starts-with "list<") or ($response_type | str starts-with "table<")) {
         log $"WARNING: Invalid Repology response for: ($project)"
         return null
     }
     $response
 }
 
-export def repology-get-metadata [project: string, repo_filter: string = ""] {
+def repology-get-metadata [project: string, repo_filter: string = ""] {
     let project_data = repology-fetch-project $project
     if $project_data == null or ($project_data | is-empty) {
         return {description: "", licenses: [], version: "", repo: ""}
@@ -57,15 +58,15 @@ export def repology-get-metadata [project: string, repo_filter: string = ""] {
     }
 }
 
-export def repology-get-description [project: string, repo_filter: string = ""] {
+def repology-get-description [project: string, repo_filter: string = ""] {
     repology-get-metadata $project $repo_filter | get description
 }
 
-export def repology-get-version [project: string, repo_filter: string = ""] {
+def repology-get-version [project: string, repo_filter: string = ""] {
     repology-get-metadata $project $repo_filter | get version
 }
 
-export def repology-get-licenses [project: string, repo_filter: string = ""] {
+def repology-get-licenses [project: string, repo_filter: string = ""] {
     repology-get-metadata $project $repo_filter | get licenses | str join ", "
 }
 

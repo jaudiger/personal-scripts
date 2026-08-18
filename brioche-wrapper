@@ -13,6 +13,7 @@ use ./misc/brioche-helpers/mod.nu [set-quiet log die parse-limit parse-exclusion
 use ./misc/brioche-helpers/homebrew.nu [fetch-homebrew]
 use ./misc/brioche-helpers/nixpkgs.nu [fetch-nixpkgs]
 use ./misc/brioche-helpers/arch.nu [fetch-arch]
+use ./misc/brioche-helpers/build-type-lookup.nu [fetch-homebrew-info fetch-nixpkgs-info fetch-arch-info]
 
 def build-default-exclusions [enabled: bool] {
     if not $enabled { return [] }
@@ -37,6 +38,23 @@ def run-source [source: string, limit: int, exclusions: list<string>] {
         "arch" => (fetch-arch $limit $exclusions)
         _ => []
     }
+}
+
+def enrich-package-recipes [package: record] {
+    mut recipes = $package.recipes
+    if ($recipes.homebrew? | default null) == null {
+        let recipe = try { fetch-homebrew-info $package.name } catch { {} }
+        if not ($recipe | is-empty) { $recipes = $recipes | upsert homebrew $recipe }
+    }
+    if ($recipes.nixpkgs? | default null) == null {
+        let recipe = try { fetch-nixpkgs-info $package.name } catch { {} }
+        if not ($recipe | is-empty) { $recipes = $recipes | upsert nixpkgs $recipe }
+    }
+    if ($recipes.arch? | default null) == null {
+        let recipe = try { fetch-arch-info $package.name } catch { {} }
+        if not ($recipe | is-empty) { $recipes = $recipes | upsert arch $recipe }
+    }
+    $package | upsert recipes $recipes
 }
 
 # List all the live update PRs, and review them one by one
@@ -90,34 +108,37 @@ def "main packages discover" [
     log $"Starting package discovery, source=($source), limit=($parsed_limit)"
 
     mut packages = []
-    mut failed_sources = []
+    mut failed = {}
     for source_name in $sources {
         log $"Running ($source_name) fetcher..."
         let attempt = try {
             {ok: true, packages: (run-source $source_name $parsed_limit $exclusions)}
-        } catch {
-            {ok: false, packages: []}
+        } catch {|error|
+            let message = $error.msg? | default ($error.rendered? | default "unknown error")
+            {ok: false, packages: [], error: $message}
         }
         if $attempt.ok {
             $packages = ($packages ++ $attempt.packages)
         } else {
-            log $"WARNING: ($source_name) fetcher failed"
-            $failed_sources = ($failed_sources | append $source_name)
+            let message = $attempt.error? | default "unknown error"
+            log $"WARNING: ($source_name) fetcher failed: ($message)"
+            $failed = ($failed | upsert $source_name [$message])
         }
     }
 
     let total_found = $packages | length
     let deduplicated = $packages | uniq-by name
+    let enriched = $deduplicated | each {|package| enrich-package-recipes $package }
     let timestamp = date now | format date "%Y-%m-%dT%H:%M:%SZ"
-    log $"Discovery complete: ($deduplicated | length) packages after filtering"
+    log $"Discovery complete: ($enriched | length) packages after filtering"
     {
-        packages: $deduplicated
+        packages: $enriched
         metadata: {
             total_found: $total_found
-            after_filtering: ($deduplicated | length)
+            after_filtering: ($enriched | length)
             excluded_count: ($default_exclusions | length)
             sources_checked: $sources
-            failed_sources: $failed_sources
+            failed: $failed
             timestamp: $timestamp
         }
     } | to json --raw
