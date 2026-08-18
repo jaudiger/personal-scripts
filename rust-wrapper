@@ -28,18 +28,7 @@ def "main cache cleanup" [
     --quiet # Do not print the build directories cleaned
 ]: nothing -> nothing {
     # Global cleanup
-    for folder in $CARGO_GLOBAL_CACHE_FOLDERS {
-        if ($folder | path exists) {
-            if not $quiet {
-                print $"Cleaning global directory ($folder)"
-            }
-
-            if not $dry_run {
-                rm -r $folder
-            }
-        }
-    }
-    for folder in $RUSTUP_GLOBAL_CACHE_FOLDERS {
+    ($CARGO_GLOBAL_CACHE_FOLDERS ++ $RUSTUP_GLOBAL_CACHE_FOLDERS) | each {|folder|
         if ($folder | path exists) {
             if not $quiet {
                 print $"Cleaning global directory ($folder)"
@@ -54,23 +43,19 @@ def "main cache cleanup" [
     # Local cleanup
     let local_directories = glob $"($path)/**/{($CARGO_LOCAL_BUILD_FOLDER),($WASM_LOCAL_BUILD_FOLDER)}"
 
-    for local_directory in $local_directories {
-        # Skip the directory if it is not part of a direct parent directory
-        # (i.e. it is not a Cargo project)
-        if not ($"($local_directory)/../($CARGO_FILE)" | path exists) {
-            continue
-        }
+    # Skip the directory if it is not part of a direct parent directory
+    # (i.e. it is not a Cargo project)
+    $local_directories
+        | where {|local_directory| $"($local_directory)/../($CARGO_FILE)" | path exists }
+        | each {|local_directory|
+            if not $quiet {
+                print $"Cleaning the directory ($local_directory)"
+            }
 
-        if not $quiet {
-            print $"Cleaning the directory ($local_directory)"
+            if not $dry_run {
+                rm -r $local_directory
+            }
         }
-
-        if $dry_run {
-            continue
-        }
-
-        rm -r $local_directory
-    }
 }
 
 # Update the cargo version of the current directory

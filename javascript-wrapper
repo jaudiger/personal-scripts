@@ -64,38 +64,38 @@ def "main cache cleanup" [
     # Local cleanup
     let local_directories = glob $"($path)/**/{($NEXT_LOCAL_BUILD_FOLDER),($PNPM_LOCAL_STORE_FOLDER),($JS_LOCAL_BUILD_FOLDER),($NODE_LOCAL_MODULES_FOLDER)}"
 
-    for local_directory in $local_directories {
-        # Skip the directory if it is not part of a direct parent directory
-        # (i.e. directories are not at the root, or there is a .venv directory)
-        let stats = ($local_directory | split row '/' | uniq --count)
-        let dist = ($stats | find dist)
-        let node_modules = ($stats | find --regex "^node_modules$")
-        let venv = ($stats | find --regex "^.venv$")
-        if ($venv | is-not-empty) {
-            continue
+    # Skip the directory if it is not part of a direct parent directory
+    # (i.e. directories are not at the root, or there is a .venv directory)
+    $local_directories
+        | each {|local_directory|
+            let stats = ($local_directory | split row '/' | uniq --count)
+            let dist = ($stats | find dist)
+            let node_modules = ($stats | find --regex "^node_modules$")
+            let venv = ($stats | find --regex "^.venv$")
+            let dist_count = if ($dist | is-empty) { 0 } else { $dist | get count.0 }
+            let node_modules_count = if ($node_modules | is-empty) { 0 } else { $node_modules | get count.0 }
+            let is_valid = not (
+                ($venv | is-not-empty)
+                or (($dist | is-not-empty) and ($node_modules | is-not-empty))
+                or (($dist_count > 1) or ($node_modules_count > 1))
+                or not ($"($local_directory)/../($PACKAGE_FILE)" | path exists)
+            )
+            {
+                path: $local_directory
+                is_valid: $is_valid
+            }
         }
-        if ($dist | is-not-empty) and ($node_modules | is-not-empty) {
-            continue
-        }
-        if (($dist | is-not-empty) and ($dist | get count.0) > 1) or (($node_modules | is-not-empty) and ($node_modules | get count.0) > 1) {
-            continue
-        }
+        | where is_valid
+        | each {|entry|
+            let local_directory = $entry.path
+            if not $quiet {
+                print $"Cleaning the directory ($local_directory)"
+            }
 
-        # Skip the build directory if there is no configuration file at the root
-        if not ($"($local_directory)/../($PACKAGE_FILE)" | path exists) {
-            continue
+            if not $dry_run {
+                rm -r $local_directory
+            }
         }
-
-        if not $quiet {
-            print $"Cleaning the directory ($local_directory)"
-        }
-
-        if $dry_run {
-            continue
-        }
-
-        rm -r $local_directory
-    }
 }
 
 def main []: nothing -> nothing {}

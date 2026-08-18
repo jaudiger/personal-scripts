@@ -21,24 +21,27 @@ def "main cache cleanup" [
     # Local cleanup
     let local_directories = glob $"($path)/**/($TERRAFORM_CACHE_FOLDER)"
 
-    for local_directory in $local_directories {
-        # Skip the directory if it is not part of a direct parent directory
-        let stats = ($local_directory | split row '/' | uniq --count)
-        let terragrunt_folder = ($stats | find --regex $"^($TERRAGRUNT_CACHE_FOLDER)$")
-        if ($terragrunt_folder | is-not-empty) {
-            continue
+    # Skip the directory if it is not part of a direct parent directory
+    $local_directories
+        | each {|local_directory|
+            let stats = ($local_directory | split row '/' | uniq --count)
+            let terragrunt_folder = ($stats | find --regex $"^($TERRAGRUNT_CACHE_FOLDER)$")
+            {
+                path: $local_directory
+                is_terragrunt: ($terragrunt_folder | is-not-empty)
+            }
         }
+        | where {|entry| not $entry.is_terragrunt }
+        | each {|entry|
+            let local_directory = $entry.path
+            if not $quiet {
+                print $"Cleaning the directory ($local_directory)"
+            }
 
-        if not $quiet {
-            print $"Cleaning the directory ($local_directory)"
+            if not $dry_run {
+                rm -r $local_directory
+            }
         }
-
-        if $dry_run {
-            continue
-        }
-
-        rm -r $local_directory
-    }
 }
 
 # Update all the lock files of the current directory recursively

@@ -30,17 +30,15 @@ def "main cache cleanup" [
     # Local cleanup
     let local_directories = glob $"($path)/**/{($ZIG_LOCAL_CACHE_FOLDER),($ZIG_LOCAL_BUILD_FOLDER)}"
 
-    for local_directory in $local_directories {
+    $local_directories | each {|local_directory|
         if not $quiet {
             print $"Cleaning cache directory ($local_directory)"
         }
 
-        if $dry_run {
-            continue
+        if not $dry_run {
+            rm -r $local_directory
         }
-
-        rm -r $local_directory
-    }
+    } | ignore
 }
 
 def main []: nothing -> nothing {}

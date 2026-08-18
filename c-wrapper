@@ -19,26 +19,29 @@ def "main cache cleanup" [
     # Local cleanup
     let local_directories = glob $"($path)/**/($CMAKE_CACHE_FILE)"
 
-    for local_directory in $local_directories {
-        let local_path = ($local_directory | path dirname)
-
-        # Skip the directory if it is not part of a direct parent directory
-        let stats = ($local_path | split row '/' | uniq --count)
-        let deps_folder = ($stats | find --regex $"^($CMAKE_DEPS_FOLDER)$")
-        if ($deps_folder | is-not-empty) {
-            continue
+    $local_directories
+        | each {|local_directory|
+            # Skip the directory if it is not part of a direct parent directory
+            let local_path = ($local_directory | path dirname)
+            let stats = ($local_path | split row '/' | uniq --count)
+            let deps_folder = ($stats | find --regex $"^($CMAKE_DEPS_FOLDER)$")
+            {
+                path: $local_path
+                is_dependency: ($deps_folder | is-not-empty)
+            }
         }
+        | where {|entry| not $entry.is_dependency }
+        | each {|entry|
+            let local_path = $entry.path
+            if not $quiet {
+                print $"Cleaning the directory ($local_path)"
+            }
 
-        if not $quiet {
-            print $"Cleaning the directory ($local_path)"
+            if not $dry_run {
+                rm -r $local_path
+            }
         }
-
-        if $dry_run {
-            continue
-        }
-
-        rm -r $local_path
-    }
+        | ignore
 }
 
 def main []: nothing -> nothing {}
