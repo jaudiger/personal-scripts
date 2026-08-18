@@ -60,22 +60,40 @@ export def is-excluded [pkg: string, exclusions: list<string>]: nothing -> bool 
 }
 
 export def github-get [url: string]: nothing -> any {
-    mut headers = {
-        "User-Agent": $USER_AGENT
-        "Accept": "application/vnd.github+json"
+    let endpoint = $url | str replace --regex '^https://api\\.github\\.com/' ''
+    let result = ^gh api $endpoint | complete
+    let response = try { $result.stdout | from json } catch {
+        let message = if ($result.stderr | is-empty) {
+            $result.stdout
+        } else {
+            $result.stderr
+        }
+        error make {msg: $message}
     }
-    if ($env.GITHUB_TOKEN? | is-not-empty) {
-        $headers = ($headers | insert Authorization $"Bearer ($env.GITHUB_TOKEN)")
-    }
-    http get --headers $headers $url
+    $response
 }
 
 export def github-raw-get [url: string]: nothing -> string {
-    mut headers = {"User-Agent": $USER_AGENT}
-    if ($env.GITHUB_TOKEN? | is-not-empty) {
-        $headers = ($headers | insert Authorization $"Bearer ($env.GITHUB_TOKEN)")
+    let parsed = $url | url parse
+    let path = $parsed.path | str trim --left --char "/" | split row "/"
+    if ($parsed.host != "raw.githubusercontent.com" or ($path | length) < 4) {
+        error make {msg: $"Unsupported GitHub raw URL: ($url)"}
     }
-    http get --raw --headers $headers $url
+    let owner = $path | get 0
+    let repo = $path | get 1
+    let ref = $path | get 2
+    let file_path = $path | skip 3 | str join "/"
+    let endpoint = $"repos/($owner)/($repo)/contents/($file_path)?ref=($ref)"
+    let result = ^gh api --header "Accept: application/vnd.github.raw" $endpoint | complete
+    if $result.exit_code != 0 {
+        let message = if ($result.stderr | is-empty) {
+            $result.stdout
+        } else {
+            $result.stderr
+        }
+        error make {msg: $message}
+    }
+    $result.stdout
 }
 
 export def api-get [url: string]: nothing -> any {
