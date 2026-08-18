@@ -22,6 +22,7 @@ export const PERSONAL_REPOSITORIES = [
     {"host": "https://github.com/", "path": "jaudiger/divan-bench-tools"},
     {"host": "https://github.com/", "path": "jaudiger/dotfiles"},
     {"host": "https://github.com/", "path": "jaudiger/educational-game-rs"},
+    {"host": "https://github.com/", "path": "jaudiger/electrical-panel-dimensioning"},
     {"host": "https://github.com/", "path": "jaudiger/gitops-deployments"},
     {"host": "https://github.com/", "path": "jaudiger/hello-winxp-zig"},
     {"host": "https://github.com/", "path": "jaudiger/iowa-rs"},
@@ -32,5 +33,6 @@ export const PERSONAL_REPOSITORIES = [
     {"host": "https://github.com/", "path": "jaudiger/personal-scripts"},
     {"host": "https://github.com/", "path": "jaudiger/personal-website"},
     {"host": "https://github.com/", "path": "jaudiger/reusable-workflows"},
+    {"host": "https://github.com/", "path": "jaudiger/work-scripts"},
     {"host": "https://github.com/", "path": "jaudiger/zcodeprism"},
 ]

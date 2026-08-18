@@ -54,7 +54,6 @@ do_backup() {
     # Backup folders
     BACKUP_FOLDERS=(
         Development/vscode
-        Development/work-scripts
     )
 
     # Export GPG keys
