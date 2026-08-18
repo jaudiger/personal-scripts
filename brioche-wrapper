@@ -15,7 +15,7 @@ use ./misc/brioche-helpers/nixpkgs.nu [fetch-nixpkgs]
 use ./misc/brioche-helpers/arch.nu [fetch-arch]
 use ./misc/brioche-helpers/build-type-lookup.nu [fetch-homebrew-info fetch-nixpkgs-info fetch-arch-info]
 
-def build-default-exclusions [enabled: bool] {
+def build-default-exclusions [enabled: bool]: nothing -> list<string> {
     if not $enabled { return [] }
     let packages_dir = ($GIT_FOLDER | path join "brioche-dev" "brioche-packages" "packages" | path expand)
     if not ($packages_dir | path exists) {
@@ -31,7 +31,7 @@ def build-default-exclusions [enabled: bool] {
     $packages
 }
 
-def run-source [source: string, limit: int, exclusions: list<string>] {
+def run-source [source: string, limit: int, exclusions: list<string>]: nothing -> list<record> {
     match $source {
         "homebrew" => (fetch-homebrew $limit $exclusions)
         "nixpkgs" => (fetch-nixpkgs $limit $exclusions)
@@ -40,20 +40,51 @@ def run-source [source: string, limit: int, exclusions: list<string>] {
     }
 }
 
-def enrich-package-recipes [package: record] {
-    mut recipes = $package.recipes
-    if ($recipes.homebrew? | default null) == null {
-        let recipe = try { fetch-homebrew-info $package.name } catch { {} }
-        if not ($recipe | is-empty) { $recipes = $recipes | upsert homebrew $recipe }
+def merge-package-records [records: list<record>]: nothing -> record {
+    $records | reduce {|record|
+        let merged = $in
+        let recipes = $record.recipes
+            | transpose source recipe
+            | where {|entry| $entry.recipe != null and not ($entry.recipe | is-empty) }
+            | reduce --fold $merged.recipes {|entry, recipes|
+                let existing = $recipes | get $entry.source
+                if ($existing == null or ($existing | is-empty)) {
+                    $recipes | upsert $entry.source $entry.recipe
+                } else {
+                    $recipes
+                }
+            }
+        $merged | upsert recipes $recipes
     }
-    if ($recipes.nixpkgs? | default null) == null {
-        let recipe = try { fetch-nixpkgs-info $package.name } catch { {} }
-        if not ($recipe | is-empty) { $recipes = $recipes | upsert nixpkgs $recipe }
-    }
-    if ($recipes.arch? | default null) == null {
-        let recipe = try { fetch-arch-info $package.name } catch { {} }
-        if not ($recipe | is-empty) { $recipes = $recipes | upsert arch $recipe }
-    }
+}
+
+def merge-packages [packages: list<record>]: nothing -> list<record> {
+    $packages
+    | group-by name
+    | values
+    | each {|records| merge-package-records $records }
+}
+
+def enrich-package-recipes [package: record]: nothing -> record {
+    let recipes = [homebrew nixpkgs arch]
+        | where {|source|
+            let recipe = $package.recipes | get $source
+            $recipe == null or ($recipe | is-empty)
+        }
+        | each {|source|
+            let recipe = try {
+                match $source {
+                    homebrew => (fetch-homebrew-info $package.name)
+                    nixpkgs => (fetch-nixpkgs-info $package.name)
+                    arch => (fetch-arch-info $package.name)
+                }
+            } catch { {} }
+            {source: $source recipe: $recipe}
+        }
+        | where {|entry| not ($entry.recipe | is-empty) }
+        | reduce --fold $package.recipes {|entry, recipes|
+            $recipes | upsert $entry.source $entry.recipe
+        }
     $package | upsert recipes $recipes
 }
 
@@ -90,7 +121,7 @@ def "main packages discover" [
     --exclude: string = ""
     --exclude-defaults
     --quiet (-q)
-] {
+]: nothing -> string {
     if $source not-in [homebrew nixpkgs arch all] {
         die $"Invalid source: ($source), must be homebrew, nixpkgs, arch, or all"
     }
@@ -105,29 +136,46 @@ def "main packages discover" [
     } else {
         [$source]
     }
-    log $"Starting package discovery, source=($source), limit=($parsed_limit)"
-
-    mut packages = []
-    mut failed = {}
-    for source_name in $sources {
-        log $"Running ($source_name) fetcher..."
-        let attempt = try {
-            {ok: true, packages: (run-source $source_name $parsed_limit $exclusions)}
-        } catch {|error|
-            let message = $error.msg? | default ($error.rendered? | default "unknown error")
-            {ok: false, packages: [], error: $message}
-        }
-        if $attempt.ok {
-            $packages = ($packages ++ $attempt.packages)
-        } else {
-            let message = $attempt.error? | default "unknown error"
-            log $"WARNING: ($source_name) fetcher failed: ($message)"
-            $failed = ($failed | upsert $source_name [$message])
-        }
+    let source_limit = if $source == "all" {
+        [($parsed_limit // 2) 1] | math max
+    } else {
+        $parsed_limit
     }
+    log $"Starting package discovery, source=($source), limit=($parsed_limit), per-source-limit=($source_limit)"
+
+    let attempts = $sources
+        | each {|source_name|
+            log $"Running ($source_name) fetcher..."
+            try {
+                {
+                    ok: true
+                    source: $source_name
+                    packages: (run-source $source_name $source_limit $exclusions)
+                }
+            } catch {|error|
+                let message = $error.msg? | default ($error.rendered? | default "unknown error")
+                log $"WARNING: ($source_name) fetcher failed: ($message)"
+                {
+                    ok: false
+                    source: $source_name
+                    packages: []
+                    error: $message
+                }
+            }
+        }
+    let packages = $attempts
+        | where ok
+        | get packages
+        | flatten
+    let failed = $attempts
+        | where {|attempt| not $attempt.ok }
+        | reduce --fold {} {|attempt, failed|
+            let message = $attempt.error? | default "unknown error"
+            $failed | upsert $attempt.source [$message]
+        }
 
     let total_found = $packages | length
-    let deduplicated = $packages | uniq-by name
+    let deduplicated = merge-packages $packages
     let enriched = $deduplicated | each {|package| enrich-package-recipes $package }
     let timestamp = date now | format date "%Y-%m-%dT%H:%M:%SZ"
     log $"Discovery complete: ($enriched | length) packages after filtering"

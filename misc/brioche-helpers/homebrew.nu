@@ -8,7 +8,7 @@ const HOMEBREW_RAW = "https://raw.githubusercontent.com/Homebrew/homebrew-core/m
 const HOMEBREW_BLOB = "https://github.com/Homebrew/homebrew-core/blob/master/Formula"
 const DEFAULT_LIMIT = "30"
 
-export def detect-homebrew-build-type [content: string] {
+export def detect-homebrew-build-type [content: string]: nothing -> string {
     if ($content =~ "(?is)cargo\\s+(install|build)" or $content =~ "(?is)system\\s+[\"']cargo[\"']") {
         "Rust"
     } else if ($content =~ "(?is)go\\s+(build|install)" or $content =~ "(?is)system\\s+[\"']go[\"']\\s*,\\s*[\"'](build|install)[\"']") {
@@ -32,7 +32,7 @@ export def detect-homebrew-build-type [content: string] {
     }
 }
 
-export def fetch-homebrew [limit: int, exclusions: list<string>] {
+export def fetch-homebrew [limit: int, exclusions: list<string>]: nothing -> list<record> {
     log "Fetching Homebrew commits..."
     let commits_url = $"($GITHUB_API)/repos/Homebrew/homebrew-core/commits?per_page=($limit)"
     mut commits = []
@@ -75,64 +75,73 @@ export def fetch-homebrew [limit: int, exclusions: list<string>] {
         return []
     }
 
-    mut packages = []
-    mut count = 0
-    for name in $names {
-        if $count >= $limit { break }
-        if (is-excluded $name $exclusions) {
-            log $"Skipping excluded package: ($name)"
-            continue
+    let candidates = $names
+        | each {|name|
+            if (is-excluded $name $exclusions) {
+                log $"Skipping excluded package: ($name)"
+                null
+            } else {
+                $name
+            }
         }
+        | compact
+        | take $limit
 
-        log $"Fetching details for: ($name)"
-        let formula_url = $"($BREW_API)/formula/($name).json"
-        let formula = try { api-get $formula_url } catch {|error|
-            let message = $error.msg? | default ($error.rendered? | default "unknown error")
-            log $"WARNING: Failed to fetch details for ($name): ($message)"
-            continue
-        }
-        let version = $formula.versions.stable? | default "unknown"
-        let description = $formula.desc? | default ""
-        let homepage = $formula.homepage? | default ""
-        let build_deps = $formula.build_dependencies? | default []
-        let runtime_deps = $formula.dependencies? | default []
-        let deps = ($build_deps ++ $runtime_deps) | str join ","
-        let source_url = $formula.urls.stable.url? | default ""
+    let packages = $candidates
+        | each {|name|
+            log $"Fetching details for: ($name)"
+            let formula_url = $"($BREW_API)/formula/($name).json"
+            let formula = try { api-get $formula_url } catch {|error|
+                let message = $error.msg? | default ($error.rendered? | default "unknown error")
+                log $"WARNING: Failed to fetch details for ($name): ($message)"
+                null
+            }
+            if $formula == null {
+                null
+            } else {
+                let version = $formula.versions.stable? | default "unknown"
+                let description = $formula.desc? | default ""
+                let homepage = $formula.homepage? | default ""
+                let build_deps = $formula.build_dependencies? | default []
+                let runtime_deps = $formula.dependencies? | default []
+                let deps = ($build_deps ++ $runtime_deps) | str join ","
+                let source_url = $formula.urls.stable.url? | default ""
 
-        let first_letter = $name | str substring 0..0
-        let ruby_formula_url = $"($HOMEBREW_RAW)/($first_letter)/($name).rb"
-        let ruby_content = try { github-raw-get $ruby_formula_url } catch { "" }
-        mut build_type = detect-homebrew-build-type $ruby_content
-        if ($build_type | is-empty) {
-            $build_type = detect-build-type $deps
-        }
+                let first_letter = $name | str substring 0..0
+                let ruby_formula_url = $"($HOMEBREW_RAW)/($first_letter)/($name).rb"
+                let ruby_content = try { github-raw-get $ruby_formula_url } catch { "" }
+                mut build_type = detect-homebrew-build-type $ruby_content
+                if ($build_type | is-empty) {
+                    $build_type = detect-build-type $deps
+                }
 
-        mut repository = $homepage
-        if not (($repository | str contains "github.com") or ($repository | str contains "gitlab.com")) {
-            let source_match = try { $source_url | parse --regex 'github\\.com/(?P<repo>[^/]+/[^/]+)' | first } catch { null }
-            if $source_match != null { $repository = $"https://github.com/($source_match.repo | str replace --regex '\\.git$' '')" }
-        }
-        if ($repository | is-empty) or not (($repository | str contains "github.com") or ($repository | str contains "gitlab.com") or ($repository | str contains "codeberg.org") or ($repository | str contains "sr.ht")) {
-            let guessed = repology-guess-repository $name
-            if not ($guessed | is-empty) { $repository = $guessed }
-        }
+                mut repository = $homepage
+                if not (($repository | str contains "github.com") or ($repository | str contains "gitlab.com")) {
+                    let source_match = try { $source_url | parse --regex 'github\\.com/(?P<repo>[^/]+/[^/]+)' | first } catch { null }
+                    if $source_match != null { $repository = $"https://github.com/($source_match.repo | str replace --regex '\\.git$' '')" }
+                }
+                if ($repository | is-empty) or not (($repository | str contains "github.com") or ($repository | str contains "gitlab.com") or ($repository | str contains "codeberg.org") or ($repository | str contains "sr.ht")) {
+                    let guessed = repology-guess-repository $name
+                    if not ($guessed | is-empty) { $repository = $guessed }
+                }
 
-        let recipe = {
-            url: $"($HOMEBREW_BLOB)/($first_letter)/($name).rb"
-            type: $build_type
-            build_deps: $build_deps
+                let recipe = {
+                    url: $"($HOMEBREW_BLOB)/($first_letter)/($name).rb"
+                    type: $build_type
+                    build_deps: $build_deps
+                }
+                make-package-json $name "homebrew" $version $description $repository {homebrew: $recipe}
+            }
         }
-        $packages = ($packages | append (make-package-json $name "homebrew" $version $description $repository {homebrew: $recipe}))
-        $count += 1
-    }
-    log $"Fetched ($count) packages from Homebrew"
+        | compact
+    log $"Fetched ($packages | length) packages from Homebrew"
     $packages
 }
 
 def main [
     --limit (-l): string = $DEFAULT_LIMIT
     --exclude: string = ""
-] {
+]: nothing -> string {
     set-quiet false
     let parsed_limit = parse-limit $limit
     let exclusions = parse-exclusions $exclude

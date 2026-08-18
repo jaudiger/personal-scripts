@@ -2,22 +2,22 @@ export const GITHUB_API = "https://api.github.com"
 export const USER_AGENT = "discover-packages/1.0"
 export const MAX_RETRIES = 3
 
-export def --env set-quiet [quiet: bool] {
+export def --env set-quiet [quiet: bool]: nothing -> nothing {
     $env.DISCOVER_PACKAGES_QUIET = $quiet
 }
 
-export def log [message: string] {
+export def log [message: string]: nothing -> nothing {
     if not ($env.DISCOVER_PACKAGES_QUIET? | default false) {
         print --stderr $"[(date now | format date "%Y-%m-%dT%H:%M:%SZ")] ($message)"
     }
 }
 
-export def die [message: string] {
+export def die [message: string]: nothing -> error {
     log $"ERROR: ($message)"
     error make {msg: $message}
 }
 
-export def parse-limit [value: string] {
+export def parse-limit [value: string]: nothing -> int {
     let parsed = try { $value | into int } catch { null }
     if $parsed == null or $parsed < 1 or not ($value =~ '^[0-9]+$') {
         die $"Invalid limit: ($value), must be a positive integer"
@@ -25,7 +25,7 @@ export def parse-limit [value: string] {
     $parsed
 }
 
-export def parse-exclusions [list: string] {
+export def parse-exclusions [list: string]: nothing -> list<string> {
     let exclusions = $list
         | split row ","
         | each { str trim }
@@ -34,7 +34,7 @@ export def parse-exclusions [list: string] {
     $exclusions
 }
 
-export def is-excluded [pkg: string, exclusions: list<string>] {
+export def is-excluded [pkg: string, exclusions: list<string>]: nothing -> bool {
     let pkg_norm = $pkg | str replace --all "_" "-"
     let pkg_nolib = $pkg
         | str replace --regex '^lib' ""
@@ -59,7 +59,7 @@ export def is-excluded [pkg: string, exclusions: list<string>] {
     }
 }
 
-export def github-get [url: string] {
+export def github-get [url: string]: nothing -> any {
     mut headers = {
         "User-Agent": $USER_AGENT
         "Accept": "application/vnd.github+json"
@@ -70,7 +70,7 @@ export def github-get [url: string] {
     http get --headers $headers $url
 }
 
-export def github-raw-get [url: string] {
+export def github-raw-get [url: string]: nothing -> string {
     mut headers = {"User-Agent": $USER_AGENT}
     if ($env.GITHUB_TOKEN? | is-not-empty) {
         $headers = ($headers | insert Authorization $"Bearer ($env.GITHUB_TOKEN)")
@@ -78,15 +78,15 @@ export def github-raw-get [url: string] {
     http get --raw --headers $headers $url
 }
 
-export def api-get [url: string] {
+export def api-get [url: string]: nothing -> any {
     http get --headers {"User-Agent": $USER_AGENT} $url
 }
 
-export def api-get-raw [url: string] {
+export def api-get-raw [url: string]: nothing -> string {
     http get --raw --headers {"User-Agent": $USER_AGENT} $url
 }
 
-export def github-api-error [response: any] {
+export def github-api-error [response: any]: nothing -> record {
     let message = if (($response | describe) == "record") {
         $response.message? | default ""
     } else {
@@ -98,7 +98,7 @@ export def github-api-error [response: any] {
     }
 }
 
-export def detect-build-type [deps: string] {
+export def detect-build-type [deps: string]: nothing -> string {
     let tokens = $deps
         | str lowercase
         | split row -r '[[:space:],]+'
@@ -124,7 +124,7 @@ export def detect-build-type [deps: string] {
     }
 }
 
-export def make-package-json [name: string, source: string, version: string, description: string, repository: string, recipes: record] {
+export def make-package-json [name: string, source: string, version: string, description: string, repository: string, recipes: record]: nothing -> record {
     let homebrew = $recipes.homebrew? | default null
     let nixpkgs = $recipes.nixpkgs? | default null
     let arch = $recipes.arch? | default null

@@ -11,7 +11,7 @@ const ARCH_API = "https://archlinux.org/packages/search/json"
 const ARCH_PACKAGE = "https://archlinux.org/packages"
 const BREW_API = "https://formulae.brew.sh/api"
 
-export def fetch-homebrew-info [name: string] {
+export def fetch-homebrew-info [name: string]: nothing -> record {
     let first_letter = $name | str substring 0..0
     let formula = try { github-raw-get $"($HOMEBREW_RAW)/($first_letter)/($name).rb" } catch { "" }
     if ($formula | is-empty) { return {} }
@@ -41,7 +41,7 @@ export def fetch-homebrew-info [name: string] {
     }
 }
 
-export def fetch-arch-info [name: string] {
+export def fetch-arch-info [name: string]: nothing -> record {
     let response = try { api-get $"($ARCH_API)/?q=($name)&repo=Extra&repo=Core" } catch { return {} }
     let package = $response.results? | default [] | where pkgname == $name | first
     if $package == null { return {} }
@@ -61,7 +61,7 @@ export def fetch-arch-info [name: string] {
     }
 }
 
-export def fetch-nixpkgs-info [name: string] {
+export def fetch-nixpkgs-info [name: string]: nothing -> record {
     let file = fetch-nix-file-info $name
     if $file == null { return {} }
     let content = $file.content
@@ -76,7 +76,7 @@ export def fetch-nixpkgs-info [name: string] {
     }
 }
 
-def main [name: string] {
+def main [name: string]: nothing -> string {
     set-quiet false
     log $"Looking up build type for: ($name)"
     log "Fetching Homebrew info..."

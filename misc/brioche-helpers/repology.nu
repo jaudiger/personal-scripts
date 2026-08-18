@@ -5,7 +5,7 @@ use ./mod.nu [github-get log]
 export const REPOLOGY_API = "https://repology.org/api/v1"
 export const REPOLOGY_USER_AGENT = "brioche-packages/1.0 (https://github.com/brioche-dev/brioche-packages)"
 
-def repology-fetch-project [project: string] {
+def repology-fetch-project [project: string]: nothing -> any {
     let url = $"($REPOLOGY_API)/project/($project)"
     let response = try {
         http get --headers {"User-Agent": $REPOLOGY_USER_AGENT} $url
@@ -21,7 +21,7 @@ def repology-fetch-project [project: string] {
     $response
 }
 
-def repology-get-metadata [project: string, repo_filter: string = ""] {
+def repology-get-metadata [project: string, repo_filter: string = ""]: nothing -> record {
     let project_data = repology-fetch-project $project
     if $project_data == null or ($project_data | is-empty) {
         return {description: "", licenses: [], version: "", repo: ""}
@@ -58,19 +58,19 @@ def repology-get-metadata [project: string, repo_filter: string = ""] {
     }
 }
 
-def repology-get-description [project: string, repo_filter: string = ""] {
+def repology-get-description [project: string, repo_filter: string = ""]: nothing -> string {
     repology-get-metadata $project $repo_filter | get description
 }
 
-def repology-get-version [project: string, repo_filter: string = ""] {
+def repology-get-version [project: string, repo_filter: string = ""]: nothing -> string {
     repology-get-metadata $project $repo_filter | get version
 }
 
-def repology-get-licenses [project: string, repo_filter: string = ""] {
+def repology-get-licenses [project: string, repo_filter: string = ""]: nothing -> string {
     repology-get-metadata $project $repo_filter | get licenses | str join ", "
 }
 
-export def repology-guess-repository [project: string] {
+export def repology-guess-repository [project: string]: nothing -> string {
     let url = $"https://api.github.com/search/repositories?q=($project)+in:name&sort=stars&per_page=1"
     let response = try { github-get $url } catch { return "" }
     let total_count = $response.total_count? | default 0
@@ -87,7 +87,7 @@ export def repology-guess-repository [project: string] {
     }
 }
 
-export def fetch-repology-metadata [project: string, repo_filter: string = "", guess_repo: string = ""] {
+export def fetch-repology-metadata [project: string, repo_filter: string = "", guess_repo: string = ""]: nothing -> record {
     let metadata = repology-get-metadata $project $repo_filter
     let repository = if $guess_repo == "guess_repo" {
         repology-guess-repository $project
@@ -102,7 +102,7 @@ export def main [
     --repo: string = ""
     --guess-repo
     --field: string = ""
-] {
+]: nothing -> any {
     if $package == null {
         print --stderr "A package name is required"
         exit 1

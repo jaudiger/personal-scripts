@@ -8,14 +8,14 @@ const ARCH_API = "https://archlinux.org/packages/search/json"
 const ARCH_PACKAGE = "https://archlinux.org/packages"
 const DEFAULT_LIMIT = "30"
 
-def xml-text [node: record] {
+def xml-text [node: record]: nothing -> string {
     $node.content
     | where {|entry| $entry.tag == null }
     | get content
     | str join ""
 }
 
-def parse-rss-feed [rss_content: string] {
+def parse-rss-feed [rss_content: string]: nothing -> list<record> {
     let document = try { $rss_content | from xml } catch { return [] }
     let channel = $document.content | where tag == "channel" | first
     if $channel == null { return [] }
@@ -61,7 +61,7 @@ def parse-rss-feed [rss_content: string] {
     } | where {|entry| $entry != null }
 }
 
-export def fetch-arch [limit: int, exclusions: list<string>] {
+export def fetch-arch [limit: int, exclusions: list<string>]: nothing -> list<record> {
     log "Fetching Arch Linux RSS feed..."
     let rss_content = try { api-get-raw $ARCH_RSS_FEED } catch {|error|
         let message = $error.msg? | default ($error.rendered? | default "unknown error")
@@ -73,67 +73,72 @@ export def fetch-arch [limit: int, exclusions: list<string>] {
         return []
     }
 
-    mut packages = []
-    mut seen = []
-    mut count = 0
-    for entry in $entries {
-        if $count >= $limit { break }
-        let name = $entry.name
-        if ($entry.repo | str contains "-testing") or ($entry.repo | str contains "-staging") { continue }
-        if $name in $seen { continue }
-        $seen = ($seen | append $name)
-        if (is-excluded $name $exclusions) {
-            log $"Skipping excluded package: ($name)"
-            continue
+    let candidates = $entries
+        | where {|entry|
+            not (($entry.repo | str contains "-testing") or ($entry.repo | str contains "-staging"))
         }
+        | uniq-by name
+        | each {|entry|
+            if (is-excluded $entry.name $exclusions) {
+                log $"Skipping excluded package: ($entry.name)"
+                null
+            } else {
+                $entry
+            }
+        }
+        | compact
 
-        log $"Fetching details for: ($name)"
-        let api_url = $"($ARCH_API)?name=($name)"
-        let api_json = try { api-get $api_url } catch { null }
-        mut url = ""
-        mut build_deps = []
-        mut build_type = "Make"
-        mut recipe_url = ""
-        if $api_json != null {
-            let result = $api_json.results? | default [] | first
-            if $result != null {
-                $url = $result.url? | default ""
-                $build_deps = $result.makedepends? | default []
-                if not ($build_deps | is-empty) {
-                    $build_type = detect-build-type ($build_deps | str join ",")
-                }
-                let repo = $result.repo? | default ""
-                let arch = $result.arch? | default ""
-                let package_name = $result.pkgname? | default $name
-                if not ($repo | is-empty) and not ($arch | is-empty) {
-                    $recipe_url = $"($ARCH_PACKAGE)/($repo)/($arch)/($package_name)/"
+    let packages = $candidates
+        | each {|entry|
+            let name = $entry.name
+            log $"Fetching details for: ($name)"
+            let api_url = $"($ARCH_API)?name=($name)"
+            let api_json = try { api-get $api_url } catch { null }
+            mut url = ""
+            mut build_deps = []
+            mut build_type = "Make"
+            mut recipe_url = ""
+            if $api_json != null {
+                let result = $api_json.results? | default [] | first
+                if $result != null {
+                    $url = $result.url? | default ""
+                    $build_deps = $result.makedepends? | default []
+                    if not ($build_deps | is-empty) {
+                        $build_type = detect-build-type ($build_deps | str join ",")
+                    }
+                    let repo = $result.repo? | default ""
+                    let arch = $result.arch? | default ""
+                    let package_name = $result.pkgname? | default $name
+                    if not ($repo | is-empty) and not ($arch | is-empty) {
+                        $recipe_url = $"($ARCH_PACKAGE)/($repo)/($arch)/($package_name)/"
+                    }
                 }
             }
-        }
-        if ($url | is-empty) or not (($url | str contains "github.com") or ($url | str contains "gitlab.com") or ($url | str contains "codeberg.org") or ($url | str contains "sr.ht")) {
-            let guessed = repology-guess-repository $name
-            if not ($guessed | is-empty) { $url = $guessed }
-        }
-        let recipe = if ($recipe_url | is-empty) {
-            {}
-        } else {
-            {
-                url: $recipe_url
-                type: $build_type
-                build_deps: $build_deps
+            if ($url | is-empty) or not (($url | str contains "github.com") or ($url | str contains "gitlab.com") or ($url | str contains "codeberg.org") or ($url | str contains "sr.ht")) {
+                let guessed = repology-guess-repository $name
+                if not ($guessed | is-empty) { $url = $guessed }
             }
+            let recipe = if ($recipe_url | is-empty) {
+                {}
+            } else {
+                {
+                    url: $recipe_url
+                    type: $build_type
+                    build_deps: $build_deps
+                }
+            }
+            make-package-json $name "arch" $entry.version $entry.description $url {arch: $recipe}
         }
-        $packages = ($packages | append (make-package-json $name "arch" $entry.version $entry.description $url {arch: $recipe}))
-        $count += 1
-    }
-    log $"Fetched ($count) packages from Arch Linux"
+        | compact
+        | take $limit
+    log $"Fetched ($packages | length) packages from Arch Linux"
     $packages
 }
 
 def main [
     --limit (-l): string = $DEFAULT_LIMIT
     --exclude: string = ""
-] {
+]: nothing -> string {
     set-quiet false
     let parsed_limit = parse-limit $limit
     let exclusions = parse-exclusions $exclude
