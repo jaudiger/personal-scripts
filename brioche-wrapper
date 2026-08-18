@@ -144,7 +144,7 @@ def "main packages discover" [
     log $"Starting package discovery, source=($source), limit=($parsed_limit), per-source-limit=($source_limit)"
 
     let attempts = $sources
-        | each {|source_name|
+        | par-each {|source_name|
             log $"Running ($source_name) fetcher..."
             try {
                 {
@@ -176,7 +176,7 @@ def "main packages discover" [
 
     let total_found = $packages | length
     let deduplicated = merge-packages $packages
-    let enriched = $deduplicated | each {|package| enrich-package-recipes $package }
+    let enriched = $deduplicated | par-each --keep-order --threads 2 {|package| enrich-package-recipes $package }
     let timestamp = date now | format date "%Y-%m-%dT%H:%M:%SZ"
     log $"Discovery complete: ($enriched | length) packages after filtering"
     {
