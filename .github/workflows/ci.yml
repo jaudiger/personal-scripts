@@ -31,12 +31,12 @@ jobs:
               - '.github/workflows/**'
 
   lint-shell:
-    uses: jaudiger/reusable-workflows/.github/workflows/static-analysis-shell.yml@0fdb4286768192eacc11e2a71d0ef74fcd1c3195
+    uses: jaudiger/reusable-workflows/.github/workflows/static-analysis-shell.yml@769f5d6babad04c95206b14de840be01e30d99f9
 
   lint-actions:
     needs: changes
     if: needs.changes.outputs.workflows == 'true'
-    uses: jaudiger/reusable-workflows/.github/workflows/static-analysis-github-actions.yml@0fdb4286768192eacc11e2a71d0ef74fcd1c3195
+    uses: jaudiger/reusable-workflows/.github/workflows/static-analysis-github-actions.yml@769f5d6babad04c95206b14de840be01e30d99f9
 
   ci:
     if: always()
