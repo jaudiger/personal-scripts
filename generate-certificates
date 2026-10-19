@@ -17,7 +17,7 @@ def generate-root-certificate [
     cert_parameters: record
 ]: nothing -> nothing {
     # Setup
-    mkdir $ca_folder
+    mkdir --fail-if-exists $ca_folder
 
     # Generate key
     if $rsa_enabled == false {
@@ -57,7 +57,7 @@ def generate-node-certificate [
     cert_parameters: record
 ]: nothing -> nothing {
     # Setup
-    mkdir $node_folder
+    mkdir --fail-if-exists $node_folder
     touch index.txt
     '01' | save serial.txt
 
@@ -154,7 +154,7 @@ def "main" [
         organizational_unit: $unit,
     }
 
-    mkdir $destination
+    mkdir --fail-if-exists $destination
 
     generate-root-certificate $ca_folder $ca_cnf_file $ca_key_pem_file $ca_key_der_file $ca_cert_pem_file $ca_cert_der_file $rsa $cert_parameters
     generate-node-certificate $node_folder $ca_cnf_file $ca_key_pem_file $ca_cert_pem_file $node_cnf_file $node_key_pem_file $node_key_der_file $node_cert_pem_file $node_cert_der_file $node_cert_signing_request_file $rsa $cert_parameters
