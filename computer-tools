@@ -51,4 +51,57 @@ def "main cleanup" [
     zig-wrapper cache cleanup --quiet ...$args
 }
 
+# Explore the filesystem
+def "main tree-explorer" []: nothing -> nothing {
+    let entries = (ls --all)
+    if ($entries | is-empty) {
+        return
+    }
+
+    let result = (
+        $entries
+        | tui label --titlebar "Tree explorer"
+        | tui split --sizes [45% 1fr] [
+            (tui box "Browse" [
+                (tui search --fuzzy --bind / --placeholder "Fuzzy search")
+                (tui tree --walk --multi --id paths)
+            ])
+            (tui preview --from paths)
+        ]
+        | tui label --status "Space: select  Enter: edit  Delete: trash  /: filter  q: quit"
+        | tui bind delete {|state|
+            let paths = (try { $state.selected | get name } catch { [] })
+            if ($paths | is-empty) {
+                null
+            } else {
+                { action: submit, selected: { operation: delete, paths: $paths } }
+            }
+        }
+        | tui run
+    )
+
+    if $result.action != "submit" {
+        return
+    }
+
+    let operation = (try { $result.selected.operation } catch { "edit" })
+    let selected_paths = if $operation == "delete" {
+        $result.selected.paths
+    } else {
+        try { $result.selected | get name } catch { [] }
+    }
+    let paths = ($selected_paths | each {|path| $path | path expand})
+
+    if ($paths | is-empty) {
+        return
+    }
+
+    if $operation == "delete" {
+        rm --interactive --recursive --trash ...$paths | ignore
+    } else {
+        let editor = ($env.VISUAL? | default $env.EDITOR? | default "nvim")
+        run-external $editor ...$paths
+    }
+}
+
 def main []: nothing -> nothing {}
